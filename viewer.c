@@ -50,6 +50,8 @@ int mousedowny = 0;
 
 bool_t texturefiltering = false;
 bool_t firstperson = false;
+bool_t nolerp = false;
+bool_t wireframe = false;
 
 model_t *model;
 
@@ -208,7 +210,7 @@ void r_init(void)
 	}
 }
 
-void animate_mesh(mesh_t *mesh, int frame)
+void animate_mesh(const mesh_t *mesh, int frame)
 {
 	frame %= model->num_frames;
 
@@ -217,7 +219,7 @@ void animate_mesh(mesh_t *mesh, int frame)
 }
 
 /* linear interpolation */
-void animate_mesh_lerp(mesh_t *mesh, float frame)
+void animate_mesh_lerp(const mesh_t *mesh, float frame)
 {
 	int i;
 	int frame0 = (int)floor(frame) % model->num_frames;
@@ -244,7 +246,7 @@ void animate_mesh_lerp(mesh_t *mesh, float frame)
 	}
 }
 
-void light_mesh(mesh_t *mesh)
+void light_mesh(const mesh_t *mesh)
 {
 	float dir[3], tdir[3];
 	int i;
@@ -408,24 +410,32 @@ void render(void)
 	else
 		setmodelmatrix(&mat4x4f_identity);
 
-	/*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);*/
-
 	frame = time * 10;
 	frame -= (float)floor(frame / model->num_frames) * model->num_frames;
 
+	if (wireframe)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glDisable(GL_CULL_FACE);
+	}
+
 	for (i = 0; i < model->num_meshes; i++)
 	{
-		mesh_t *mesh = &model->meshes[i];
+		const mesh_t *mesh = &model->meshes[i];
 
-		/*animate_mesh(mesh, (int)(time * 10) % model->num_frames);*/
-		animate_mesh_lerp(mesh, frame);
-		light_mesh(mesh);
+		if (nolerp)
+			animate_mesh(mesh, (int)frame);
+		else
+			animate_mesh_lerp(mesh, frame);
+
+		if (!wireframe)
+			light_mesh(mesh);
 
 		glEnableClientState(GL_VERTEX_ARRAY); CHECKGLERROR();
 		glVertexPointer(3, GL_FLOAT, sizeof(float[3]), r_state.vertex3f); CHECKGLERROR();
 
 	/* draw diffuse pass */
-		if (mesh->renderdata.texture_diffuse_handle)
+		if (mesh->renderdata.texture_diffuse_handle && !wireframe)
 		{
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
 			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
@@ -438,19 +448,25 @@ void render(void)
 			glDisable(GL_TEXTURE_2D); CHECKGLERROR();
 		}
 
-		glEnableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
-		glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned char[4]), r_state.colour4ub); CHECKGLERROR();
+		if (!wireframe)
+		{
+			glEnableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
+			glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned char[4]), r_state.colour4ub); CHECKGLERROR();
+		}
 
 		glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR(); /* glDrawElements must take GL_UNSIGNED_INT, GL_INT is not accepted... */
 
-		glDisableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
-		if (mesh->renderdata.texture_diffuse_handle)
+		if (!wireframe)
+		{
+			glDisableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
+		}
+		if (mesh->renderdata.texture_diffuse_handle && !wireframe)
 		{
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
 		}
 
 	/* draw fullbright pass (who needs multitexture!) */
-		if (mesh->renderdata.texture_fullbright_handle)
+		if (mesh->renderdata.texture_fullbright_handle && !wireframe)
 		{
 			glDepthFunc(GL_LEQUAL); CHECKGLERROR();
 			glBlendFunc(GL_ONE, GL_ONE); CHECKGLERROR();
@@ -475,6 +491,12 @@ void render(void)
 	}
 
 	glDisable(GL_TEXTURE_2D);
+
+	if (wireframe)
+	{
+		glEnable(GL_CULL_FACE);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 /* draw tags (draw them translucent when they are behind geometry) */
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -703,6 +725,14 @@ int main(int argc, char **argv)
 			{
 				firstperson = true;
 			}
+			else if (!strcmp(argv[i], "-nolerp"))
+			{
+				nolerp = true;
+			}
+			else if (!strcmp(argv[i], "-wireframe"))
+			{
+				wireframe = true;
+			}
 			else
 			{
 				printf("%s: unrecognized option '%s'\n", argv[0], argv[i]);
@@ -717,7 +747,7 @@ int main(int argc, char **argv)
 
 	if (!infilename[0])
 	{
-		printf("usage: %s modelfile [-tex texturefile] [-width 640] [-height 480] [-bpp 16/32] [-texturefiltering] [-firstperson]\n", argv[0]);
+		printf("usage: %s modelfile [-tex texturefile] [-width 640] [-height 480] [-bpp 16/32] [-texturefiltering] [-firstperson] [-nolerp] [-wireframe]\n", argv[0]);
 		return 0;
 	}
 
@@ -737,6 +767,7 @@ int main(int argc, char **argv)
 	vandalize_skin();
 #endif
 	r_state.max_numvertices = 0;
+	r_state.max_numtriangles = 0;
 	for (i = 0; i < model->num_meshes; i++)
 	{
 		if (model->meshes[i].num_vertices > r_state.max_numvertices)
