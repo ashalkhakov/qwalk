@@ -22,6 +22,8 @@
 #include "global.h"
 #include "matrix.h"
 
+const mat4x4f_t mat4x4f_identity = {{{1,0,0,0},{0,1,0,0},{0,0,1,0},{0,0,0,1}}};
+
 void mat4x4f_create_identity(mat4x4f_t *out)
 {
 	out->m[0][0] = 1;
@@ -115,6 +117,12 @@ void mat4x4f_concat(mat4x4f_t *out, const mat4x4f_t *in1, const mat4x4f_t *in2)
 	out->m[3][3] = in1->m[3][0] * in2->m[0][3] + in1->m[3][1] * in2->m[1][3] + in1->m[3][2] * in2->m[2][3] + in1->m[3][3] * in2->m[3][3];
 }
 
+void mat4x4f_concat_with(mat4x4f_t *out, const mat4x4f_t *in)
+{
+	mat4x4f_t outcopy = *out;
+	mat4x4f_concat(out, &outcopy, in);
+}
+
 void mat4x4f_concat_translate(mat4x4f_t *out, float x, float y, float z)
 {
 	mat4x4f_t m, r;
@@ -162,6 +170,13 @@ void mat4x4f_transform(const mat4x4f_t *in, const float v[3], float out[3])
 	out[0] = v[0] * in->m[0][0] + v[1] * in->m[0][1] + v[2] * in->m[0][2] + in->m[0][3];
 	out[1] = v[0] * in->m[1][0] + v[1] * in->m[1][1] + v[2] * in->m[1][2] + in->m[1][3];
 	out[2] = v[0] * in->m[2][0] + v[1] * in->m[2][1] + v[2] * in->m[2][2] + in->m[2][3];
+}
+
+void mat4x4f_transform_3x3(const mat4x4f_t *in, const float v[3], float out[3])
+{
+	out[0] = v[0] * in->m[0][0] + v[1] * in->m[0][1] + v[2] * in->m[0][2];
+	out[1] = v[0] * in->m[1][0] + v[1] * in->m[1][1] + v[2] * in->m[1][2];
+	out[2] = v[0] * in->m[2][0] + v[1] * in->m[2][1] + v[2] * in->m[2][2];
 }
 
 void mat4x4f_transpose(mat4x4f_t *out)

@@ -42,6 +42,8 @@ float cam_dist = 64.0f;
 mat4x4f_t viewmatrix;
 mat4x4f_t invviewmatrix;
 
+mat4x4f_t invmodelmatrix;
+
 bool_t mousedown = false;
 int mousedownx = 0;
 int mousedowny = 0;
@@ -244,10 +246,14 @@ void animate_mesh_lerp(mesh_t *mesh, float frame)
 
 void light_mesh(mesh_t *mesh)
 {
-	float dir_x = -invviewmatrix.m[0][0];
-	float dir_y = -invviewmatrix.m[1][0];
-	float dir_z = -invviewmatrix.m[2][0];
+	float dir[3], tdir[3];
 	int i;
+
+	dir[0] = -viewmatrix.m[0][0];
+	dir[1] = -viewmatrix.m[1][0];
+	dir[2] = -viewmatrix.m[2][0];
+
+	mat4x4f_transform_3x3(&invmodelmatrix, dir, tdir);
 
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
@@ -255,7 +261,7 @@ void light_mesh(mesh_t *mesh)
 		float ny = r_state.normal3f[i*3+1];
 		float nz = r_state.normal3f[i*3+2];
 
-		float dot = dir_x * nx + dir_y * ny + dir_z * nz;
+		float dot = tdir[0] * nx + tdir[1] * ny + tdir[2] * nz;
 
 		if (dot < 0)
 			dot = 0;
@@ -338,6 +344,43 @@ void calc_crap(float *xmin, float *xmax, float *ymin, float *ymax, float *znear,
 	*xmin = -*xmax;
 }
 
+void gl_uploadmatrix(GLenum mode, const mat4x4f_t *m)
+{
+	mat4x4f_t transposed = *m;
+	mat4x4f_transpose(&transposed);
+
+	glMatrixMode(mode);
+	glLoadMatrixf((GLfloat*)transposed.m);
+}
+
+void setviewmatrix(const mat4x4f_t *m)
+{
+	mat4x4f_t t;
+
+/* copy forward matrix */
+	viewmatrix = *m;
+
+/* create inverse matrix */
+	mat4x4f_invert_simple(&invviewmatrix, &viewmatrix);
+
+/* transform inverse matrix into screen coordinate space (+X = forward, +Y = left, +Z = up) */
+	mat4x4f_create_rotate(&t, -90, 1, 0, 0);
+	mat4x4f_concat_rotate(&t,  90, 0, 0, 1);
+	mat4x4f_concat_with(&t, &invviewmatrix);
+	invviewmatrix = t;
+}
+
+void setmodelmatrix(const mat4x4f_t *modelmatrix)
+{
+	mat4x4f_t m;
+
+	mat4x4f_concat(&m, &invviewmatrix, modelmatrix);
+
+	gl_uploadmatrix(GL_MODELVIEW, &m);
+
+	mat4x4f_invert_simple(&invmodelmatrix, modelmatrix);
+}
+
 void render(void)
 {
 	int i;
@@ -352,34 +395,18 @@ void render(void)
 		calc_crap(&xmin, &xmax, &ymin, &ymax, &znear, &zfar);
 		glFrustum(xmin, xmax, ymin, ymax, znear, zfar);
 	}
-	glMatrixMode(GL_MODELVIEW);
-	{
-		mat4x4f_t ct, m;
 
-		mat4x4f_create_identity(&ct);
-		mat4x4f_concat_rotate(&ct, -90, 1, 0, 0);
-		mat4x4f_concat_rotate(&ct,  90, 0, 0, 1);
+/* create view matrix */
+	mat4x4f_create_rotate(&viewmatrix, -cam_yaw, 0, 0, 1);
+	mat4x4f_concat_rotate(&viewmatrix, -cam_pitch, 0, 1, 0);
+	mat4x4f_concat_translate(&viewmatrix, -cam_dist, 0, 0);
+	setviewmatrix(&viewmatrix);
 
-		if (firstperson)
-		{
-			mat4x4f_create_identity(&viewmatrix);
-		}
-		else
-		{
-			mat4x4f_create_identity(&viewmatrix);
-			mat4x4f_concat_translate(&viewmatrix, cam_dist, 0, 0);
-			mat4x4f_concat_rotate(&viewmatrix, cam_pitch, 0, 1, 0);
-			mat4x4f_concat_rotate(&viewmatrix, cam_yaw, 0, 0, 1);
-		}
-
-		mat4x4f_invert_simple(&invviewmatrix, &viewmatrix);
-
-		mat4x4f_concat(&m, &ct, &viewmatrix);
-
-		mat4x4f_transpose(&m);
-
-		glLoadMatrixf((float*)m.m);
-	}
+/* upload modelview matrix */
+	if (firstperson)
+		setmodelmatrix(&viewmatrix);
+	else
+		setmodelmatrix(&mat4x4f_identity);
 
 	/*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);*/
 
@@ -465,31 +492,8 @@ void render(void)
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
 
-/* FIXME - do this properly (separate camera and model matrices) - this messed up lighting anyway */
-	glMatrixMode(GL_MODELVIEW);
-	{
-		mat4x4f_t ct, m;
-
-		mat4x4f_create_identity(&ct);
-		mat4x4f_concat_rotate(&ct, -90, 1, 0, 0);
-		mat4x4f_concat_rotate(&ct,  90, 0, 0, 1);
-
-		mat4x4f_create_identity(&viewmatrix);
-		mat4x4f_concat_translate(&viewmatrix, cam_dist, 0, 0);
-		mat4x4f_concat_rotate(&viewmatrix, cam_pitch, 0, 1, 0);
-		mat4x4f_concat_rotate(&viewmatrix, cam_yaw, 0, 0, 1);
-
-		mat4x4f_invert_simple(&invviewmatrix, &viewmatrix);
-
-		mat4x4f_concat(&m, &ct, &viewmatrix);
-
-		mat4x4f_transpose(&m);
-
-		glLoadMatrixf((float*)m.m);
-	}
-
 /* draw grid */
-	glDepthMask(GL_FALSE);
+	setmodelmatrix(&mat4x4f_identity);
 
 	glColor4f(0, 0, 0.5f, 1);
 	glBegin(GL_LINES);
@@ -503,8 +507,7 @@ void render(void)
 	glEnd();
 	glColor4f(1, 1, 1, 1);
 
-	glDepthMask(GL_TRUE);
-
+/* done */
 	SDL_GL_SwapBuffers();
 }
 
