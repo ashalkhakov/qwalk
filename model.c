@@ -21,26 +21,9 @@
 #include "global.h"
 #include "model.h"
 
-bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model)
+void mesh_initialize(mesh_t *mesh)
 {
-/* FIXME - check the file header, not the filename extension */
-	const char *ext = strrchr(filename, '.');
-
-	if (!ext)
-	{
-		printf("%s: no file extension\n", filename);
-		return false;
-	}
-
-	if (!strncasecmp(ext, ".mdl", 4))
-		return model_mdl_load(filedata, filesize, out_model);
-	if (!strncasecmp(ext, ".md2", 4))
-		return model_md2_load(filedata, filesize, out_model);
-	if (!strncasecmp(ext, ".md3", 4))
-		return model_md3_load(filedata, filesize, out_model);
-
-	printf("unrecognized file extension \"%s\"\n", ext);
-	return false;
+	memset(mesh, 0, sizeof(mesh_t));
 }
 
 void mesh_free(mesh_t *mesh)
@@ -49,10 +32,23 @@ void mesh_free(mesh_t *mesh)
 	qfree(mesh->vertex3f);
 	qfree(mesh->normal3f);
 	qfree(mesh->texcoord2f);
-	qfree(mesh->paddedtexcoord2f);
 	qfree(mesh->triangle3i);
-	qfree(mesh->texture.pixels);
-	qfree(mesh->paddedtexture.pixels);
+	image_free(&mesh->texture_diffuse);
+	image_free(&mesh->texture_fullbright);
+
+	if (mesh->renderdata.initialized)
+	{
+		qfree(mesh->renderdata.texcoord2f);
+		image_free(&mesh->renderdata.texture_diffuse);
+		image_free(&mesh->renderdata.texture_fullbright);
+
+	/* FIXME - release the uploaded texture */
+	}
+}
+
+void model_initialize(model_t *model)
+{
+	memset(model, 0, sizeof(model_t));
 }
 
 void model_free(model_t *model)
@@ -80,6 +76,86 @@ void model_free(model_t *model)
 	qfree(model);
 }
 
+bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error)
+{
+/* FIXME - check the file header, not the filename extension */
+	const char *ext = strrchr(filename, '.');
+
+	if (!ext)
+	{
+		if (out_error)
+			*out_error = msprintf("no file extension");
+		return false;
+	}
+
+	if (!strncasecmp(ext, ".mdl", 4))
+		return model_mdl_load(filedata, filesize, out_model, out_error);
+	if (!strncasecmp(ext, ".md2", 4))
+		return model_md2_load(filedata, filesize, out_model, out_error);
+	if (!strncasecmp(ext, ".md3", 4))
+		return model_md3_load(filedata, filesize, out_model, out_error);
+
+	if (out_error)
+		*out_error = msprintf("unrecognized file extension");
+	return false;
+}
+
+/* FIXME - some models might have no texture loaded... */
+void model_generaterenderdata(model_t *model)
+{
+	int i, j;
+	mesh_t *mesh;
+	int w, h;
+	float fw, fh;
+
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
+	{
+		if (mesh->renderdata.initialized)
+			continue;
+
+	/* pad the texture up to a power of two */
+		for (w = 1; w < mesh->texture_diffuse.width; w <<= 1);
+		for (h = 1; h < mesh->texture_diffuse.height; h <<= 1);
+
+		image_pad(&mesh->renderdata.texture_diffuse, &mesh->texture_diffuse, w, h);
+		image_pad(&mesh->renderdata.texture_fullbright, &mesh->texture_fullbright, w, h);
+
+	/* generate padded texcoords */
+		mesh->renderdata.texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
+
+		fw = (float)mesh->texture_diffuse.width / (float)w;
+		fh = (float)mesh->texture_diffuse.height / (float)h;
+		for (j = 0; j < mesh->num_vertices; j++)
+		{
+			mesh->renderdata.texcoord2f[j*2+0] = mesh->texcoord2f[j*2+0] * fw;
+			mesh->renderdata.texcoord2f[j*2+1] = mesh->texcoord2f[j*2+1] * fh;
+		}
+
+		mesh->renderdata.texture_diffuse_handle = 0;
+		mesh->renderdata.texture_fullbright_handle = 0;
+
+		mesh->renderdata.initialized = true;
+	}
+}
+
+void model_freerenderdata(model_t *model)
+{
+	int i;
+	mesh_t *mesh;
+
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
+	{
+		if (!mesh->renderdata.initialized)
+			continue;
+
+		image_free(&mesh->renderdata.texture_diffuse);
+		image_free(&mesh->renderdata.texture_fullbright);
+		qfree(mesh->renderdata.texcoord2f);
+
+	/* FIXME - release the uploaded texture */
+	}
+}
+
 /* merge all meshes into one */
 /* FIXME - currently assumes that all meshes use the same texture (other cases will get very complicated) */
 mesh_t *model_merge_meshes(model_t *model)
@@ -94,11 +170,7 @@ mesh_t *model_merge_meshes(model_t *model)
 		return &model->meshes[0];
 
 	newmesh = (mesh_t*)qmalloc(sizeof(mesh_t));
-
-	newmesh->name = NULL;
-
-	newmesh->num_vertices = 0;
-	newmesh->num_triangles = 0;
+	mesh_initialize(newmesh);
 
 	for (i = 0; i < model->num_meshes; i++)
 	{
@@ -109,7 +181,6 @@ mesh_t *model_merge_meshes(model_t *model)
 	newmesh->vertex3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->num_frames);
 	newmesh->normal3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->num_frames);
 	newmesh->texcoord2f = (float*)qmalloc(sizeof(float[2]) * newmesh->num_vertices);
-	newmesh->paddedtexcoord2f = (float*)qmalloc(sizeof(float[2]) * newmesh->num_vertices);
 	newmesh->triangle3i = (int*)qmalloc(sizeof(int[3]) * newmesh->num_triangles);
 
 	ofs_verts = 0;
@@ -125,18 +196,6 @@ mesh_t *model_merge_meshes(model_t *model)
 		{
 			newmesh->texcoord2f[(ofs_verts+j)*2+0] = mesh->texcoord2f[j*2+0];
 			newmesh->texcoord2f[(ofs_verts+j)*2+1] = mesh->texcoord2f[j*2+1];
-
-			/* FIXME!! */
-			if (mesh->paddedtexcoord2f)
-			{
-				newmesh->paddedtexcoord2f[(ofs_verts+j)*2+0] = mesh->paddedtexcoord2f[j*2+0];
-				newmesh->paddedtexcoord2f[(ofs_verts+j)*2+1] = mesh->paddedtexcoord2f[j*2+1];
-			}
-			else
-			{
-				newmesh->paddedtexcoord2f[(ofs_verts+j)*2+0] = 0.0f;
-				newmesh->paddedtexcoord2f[(ofs_verts+j)*2+1] = 0.0f;
-			}
 		}
 
 		iv = mesh->vertex3f;
@@ -148,17 +207,8 @@ mesh_t *model_merge_meshes(model_t *model)
 
 			for (k = 0; k < mesh->num_vertices; k++)
 			{
-				v[0] = iv[0];
-				v[1] = iv[1];
-				v[2] = iv[2];
-				v += 3;
-				iv += 3;
-
-				n[0] = in[0];
-				n[1] = in[1];
-				n[2] = in[2];
-				n += 3;
-				in += 3;
+				v[0] = iv[0]; v[1] = iv[1]; v[2] = iv[2]; v += 3; iv += 3;
+				n[0] = in[0]; n[1] = in[1]; n[2] = in[2]; n += 3; in += 3;
 			}
 		}
 
@@ -173,9 +223,8 @@ mesh_t *model_merge_meshes(model_t *model)
 		ofs_tris += mesh->num_triangles;
 	}
 
-	image_clone(&newmesh->texture, &model->meshes[0].texture); /* FIXME */
-	image_clone(&newmesh->paddedtexture, &model->meshes[0].paddedtexture);
-	newmesh->texture_handle = 0;
+	image_clone(&newmesh->texture_diffuse, &model->meshes[0].texture_diffuse); /* FIXME */
+	image_clone(&newmesh->texture_fullbright, &model->meshes[0].texture_fullbright);
 
 	for (i = 0; i < model->num_meshes; i++)
 		mesh_free(&model->meshes[i]);

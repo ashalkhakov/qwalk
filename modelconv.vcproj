@@ -187,6 +187,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\image_pcx.c"
+				>
+			</File>
+			<File
 				RelativePath=".\image_tga.c"
 				>
 			</File>

@@ -15,11 +15,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
 #include <string.h>
 
 #include "global.h"
 #include "model.h"
+
+extern const float anorms[162][3];
+int compress_normal(const float *normal);
 
 typedef struct md2_header_s
 {
@@ -150,7 +152,7 @@ static void swap_md2(void *filedata, size_t filesize)
 	}
 }
 
-bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
+bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
 	md2_header_t *header;
@@ -160,7 +162,6 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 	model_t model;
 	mesh_t *mesh;
 	md2_meshvert_t *meshverts;
-	int pw, ph;
 	float iwidth, iheight;
 
 	header = (md2_header_t*)f;
@@ -168,12 +169,14 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 /* validate format */
 	if (memcmp(header->ident, "IDP2", 4))
 	{
-		printf("Wrong format (not IDP2).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (not IDP2)");
 		return false;
 	}
 	if (LittleLong(header->version) != 8)
 	{
-		printf("Wrong format (version not 8).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (version not 8)");
 		return false;
 	}
 
@@ -183,9 +186,6 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 /* stuff */
 	texcoords = (md2_texcoord_t*)(f + header->offset_st);
 	triangles = (md2_triangle_t*)(f + header->offset_tris);
-
-	for (pw = 1; pw < header->skinwidth; pw <<= 1);
-	for (ph = 1; ph < header->skinheight; ph <<= 1);
 
 /* stuff */
 	model.num_frames = header->num_frames;
@@ -209,6 +209,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 	model.synctype = 0;
 
 	mesh = &model.meshes[0];
+	mesh_initialize(mesh);
 
 	mesh->name = NULL;
 
@@ -254,20 +255,6 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 		mesh->texcoord2f[i*2+1] = (texcoords[meshverts[i].texcoord].t + 0.5f) * iheight;
 	}
 
-	if (pw > header->skinwidth || ph > header->skinheight)
-	{
-		mesh->paddedtexcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
-		iwidth = 1.0f / pw;
-		iheight = 1.0f / ph;
-		for (i = 0; i < mesh->num_vertices; i++)
-		{
-			mesh->paddedtexcoord2f[i*2+0] = (texcoords[meshverts[i].texcoord].s + 0.5f) * iwidth;
-			mesh->paddedtexcoord2f[i*2+1] = (texcoords[meshverts[i].texcoord].t + 0.5f) * iheight;
-		}
-	}
-	else
-		mesh->paddedtexcoord2f = NULL;
-
 	mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	mesh->normal3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	f += header->offset_frames;
@@ -296,16 +283,14 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model)
 
 	qfree(meshverts);
 
-/* FIXME - what's going to happen with non-power-of-two textures? */
-	mesh->texture.width = 0;
-	mesh->texture.height = 0;
-	mesh->texture.pixels = NULL;
+/* FIXME? */
+	mesh->texture_diffuse.width = 0;
+	mesh->texture_diffuse.height = 0;
+	mesh->texture_diffuse.pixels = NULL;
 
-	mesh->paddedtexture.width = 0;
-	mesh->paddedtexture.height = 0;
-	mesh->paddedtexture.pixels = NULL;
-
-	mesh->texture_handle = 0;
+	mesh->texture_fullbright.width = 0;
+	mesh->texture_fullbright.height = 0;
+	mesh->texture_fullbright.pixels = NULL;
 
 	*out_model = model;
 	return true;

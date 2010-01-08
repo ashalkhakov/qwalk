@@ -59,6 +59,7 @@ void *qmalloc_(size_t numbytes, const char *file, int line);
 void qfree(void *mem);
 void dumpleaks(void);
 
+char *msprintf(const char *format, ...);
 void strlcpy(char *dest, const char *src, size_t size);
 
 #ifdef WIN32
@@ -75,5 +76,9 @@ typedef struct dllfunction_s { const char *name; void **funcvariable; } dllfunct
 bool_t loadlibrary(const char *dllname, dllhandle_t *handle, const dllfunction_t *functions);
 void unloadlibrary(dllhandle_t *handle);
 void *getprocaddress(dllhandle_t handle, const char *name);
+
+void add_atexit_event(void (*function)(void));
+void set_atexit_final_event(void (*function)(void));
+void call_atexit_events(void);
 
 #endif

@@ -190,7 +190,7 @@ static void swap_md3(void *filedata, size_t filesize)
 	}
 }
 
-bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model)
+bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
 	md3_header_t *header;
@@ -202,12 +202,14 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model)
 /* validate format */
 	if (memcmp(header->ident, "IDP3", 4))
 	{
-		printf("Wrong format (not IDP3).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (not IDP3)");
 		return false;
 	}
 	if (LittleLong(header->version) != 15)
 	{
-		printf("Wrong format (version not 6).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (version not 6)");
 		return false;
 	}
 
@@ -285,11 +287,15 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model)
 
 		if (memcmp(md3_mesh->ident, "IDP3", 4))
 		{
-			printf("Mesh has wrong ident (not IDP3).\n");
+			if (out_error)
+				*out_error = msprintf("mesh has wrong ident (not IDP3)");
+			/* FIXME - free everything */
 			return false;
 		}
 
 		printf("mesh %d: \"%s\"\n", i, md3_mesh->name);
+
+		mesh_initialize(mesh);
 
 		mesh->name = (char*)qmalloc(strlen(md3_mesh->name) + 1);
 		strcpy(mesh->name, md3_mesh->name);
@@ -304,8 +310,6 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model)
 	/* load texcoords */
 		mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
 		memcpy(mesh->texcoord2f, f + md3_mesh->lump_texcoords, sizeof(float) * mesh->num_vertices * 2);
-
-		mesh->paddedtexcoord2f = NULL;
 
 	/* load frames */
 		mesh->vertex3f = (float*)qmalloc(sizeof(float) * model.num_frames * mesh->num_vertices * 3);
@@ -337,15 +341,13 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model)
 		}
 
 	/* FIXME? */
-		mesh->texture.width = 0;
-		mesh->texture.height = 0;
-		mesh->texture.pixels = NULL;
+		mesh->texture_diffuse.width = 0;
+		mesh->texture_diffuse.height = 0;
+		mesh->texture_diffuse.pixels = NULL;
 
-		mesh->paddedtexture.width = 0;
-		mesh->paddedtexture.height = 0;
-		mesh->paddedtexture.pixels = NULL;
-
-		mesh->texture_handle = 0;
+		mesh->texture_fullbright.width = 0;
+		mesh->texture_fullbright.height = 0;
+		mesh->texture_fullbright.pixels = NULL;
 
 		f += md3_mesh->lump_end;
 	}

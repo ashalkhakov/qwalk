@@ -3,12 +3,13 @@
  |TODO|
  +----+
 
-- PCX import.
-- Rewrite the padded texcoord system (again).
+- Test the PCX importer with "troublesome" PCX files.
 - Merge meshes with different textures.
 - Keep compressed MDL vertex coordinates, indices, etc. intact in the case of
   importing, processing & exporting an MDL (don't want any "drift", and don't
   want the vertices unnecessarily split up).
+- When exporting MDL/MD2, merge all vertices with the same normal but different
+  texcoords, since texcoords are stored per-triangle.
 - MDLs with a skin width not multiple of 4 should be padded.
 - Command for drawing wireframe lines on the skin.
 - Fix the image resize function to work when scaling up.
@@ -22,3 +23,11 @@
 - Write an MD3 writer.
 - Do air-tight error checking to avoid all potential crashes (and detect all
   invalid data imported models).
+- The viewer shouldn't use 100% CPU usage.
+- Test exporting empty models (no vertices/triangles) to each format. Note in
+  compatibility notes whether engines will be able to load empty models (or
+  whether a 'null' model should instead be a single degenerate triangle).
+- Modes to emulate certain engines' rendering exactly, including lighting,
+  texture coordinate rounding, and crappy GLQuake texture resampling.
+- Optional stencil shadows mode.
+- Preview v_ models in 'first person mode', as they'd appear in game.

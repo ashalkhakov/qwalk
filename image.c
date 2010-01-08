@@ -31,6 +31,8 @@ bool_t image_load(const char *filename, void *filedata, size_t filesize, image_r
 		return false;
 	}
 
+	if (!strncasecmp(ext, ".pcx", 4))
+		return image_pcx_load(filedata, filesize, out_image);
 	if (!strncasecmp(ext, ".tga", 4))
 		return image_tga_load(filedata, filesize, out_image);
 	if (!strncasecmp(ext, ".jpg", 4) || !strncasecmp(ext, ".jpeg", 5))
@@ -45,24 +47,51 @@ void image_free(image_rgba_t *image)
 	qfree(image->pixels);
 }
 
-bool_t image_clone(image_rgba_t *dest, const image_rgba_t *source)
+bool_t image_createfill(image_rgba_t *out_image_rgba, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	dest->width = source->width;
-	dest->height = source->height;
-	dest->pixels = (unsigned char*)qmalloc(dest->width * dest->height * 4);
-	if (!dest->pixels)
+	int i;
+	unsigned char *pixels = (unsigned char*)qmalloc(width * height * 4);
+	if (!pixels)
 		return false;
-	memcpy(dest->pixels, source->pixels, dest->width * dest->height * 4);
+	for (i = 0; i < width * height; i++)
+	{
+		pixels[i*4+0] = r;
+		pixels[i*4+1] = g;
+		pixels[i*4+2] = b;
+		pixels[i*4+3] = a;
+	}
+	out_image_rgba->width = width;
+	out_image_rgba->height = height;
+	out_image_rgba->pixels = pixels;
 	return true;
 }
 
-unsigned char palettize_colour(const unsigned char palette[768], unsigned char r, unsigned char g, unsigned char b)
+bool_t image_clone(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba)
+{
+	unsigned char *pixels = (unsigned char*)qmalloc(in_image_rgba->width * in_image_rgba->height * 4);
+	if (!pixels)
+		return false;
+	memcpy(pixels, in_image_rgba->pixels, in_image_rgba->width * in_image_rgba->height * 4);
+	out_image_rgba->width = in_image_rgba->width;
+	out_image_rgba->height = in_image_rgba->height;
+	out_image_rgba->pixels = pixels;
+	return true;
+}
+
+/* which palette entries are fullbrights. currently the last 32 colours are fullbright. TODO - you should be able to load a colormap with any
+ * configuration of fullbrights. */
+static const unsigned int fullbright_flags[8] = { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF };
+
+static unsigned char palettize_colour(const unsigned char palette[768], bool_t fullbright, unsigned char r, unsigned char g, unsigned char b)
 {
 	int i, dist;
 	int besti = -1, bestdist;
 
-	for (i = 0; i < 256 - 32; i++) /* ignore the fullbrights (FIXME - this is a hack, the fullbrights might be somewhere else) */
+	for (i = 0; i < 256; i++)
 	{
+		if (fullbright != !!(fullbright_flags[i >> 5] & (1U << (i & 31))))
+			continue;
+
 		dist = abs(palette[i*3+0] - r) + abs(palette[i*3+1] - g) + abs(palette[i*3+2] - b);
 
 		if (besti == -1 || dist < bestdist)
@@ -72,26 +101,33 @@ unsigned char palettize_colour(const unsigned char palette[768], unsigned char r
 		}
 	}
 
-	return besti;
+	return (besti != -1) ? besti : 0;
 }
 
-void palettize_image(const image_rgba_t *image_rgba, const unsigned char palette[768], image_paletted_t *out_image_paletted)
+void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const unsigned char palette[768], image_paletted_t *out_image_paletted)
 {
 	int i;
-	unsigned char *in, *out;
+	const unsigned char *in_diffuse, *in_fullbright;
+	unsigned char *out;
 
-	out_image_paletted->width = image_rgba->width;
-	out_image_paletted->height = image_rgba->height;
+	out_image_paletted->width = image_diffuse->width;
+	out_image_paletted->height = image_diffuse->height;
 	out_image_paletted->pixels = (unsigned char*)qmalloc(out_image_paletted->width * out_image_paletted->height);
 
-	in = image_rgba->pixels;
+	in_diffuse = image_diffuse->pixels;
+	in_fullbright = image_fullbright->pixels;
 	out = out_image_paletted->pixels;
-	for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in += 4, out++)
-		*out = palettize_colour(palette, in[0], in[1], in[2]);
+	for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, in_fullbright += 4, out++)
+	{
+		if (in_fullbright[0] || in_fullbright[1] || in_fullbright[2])
+			*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
+		else
+			*out = palettize_colour(palette, false, in_diffuse[0], in_diffuse[1], in_diffuse[2]);
+	}
 }
 
 /* FIXME - incomplete - will fail if you try to make an image bigger */
-void resize_image(image_rgba_t *image_rgba, int width, int height)
+void image_resize(image_rgba_t *image_rgba, int width, int height)
 {
 	int x, y;
 	unsigned char *pixels = (unsigned char*)qmalloc(width * height * 4);
@@ -177,43 +213,117 @@ void resize_image(image_rgba_t *image_rgba, int width, int height)
 	image_rgba->pixels = pixels;
 }
 
-bool_t pad_image(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height)
+/* pad an image to a larger size. the edge pixels will be repeated instead of filled with black, to avoid any unwanted
+ * bleeding if mipmapped and/or rendered with texture filtering. the in and out images can be the same. */
+bool_t image_pad(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height)
 {
-	unsigned char *pixels;
+	const unsigned char *inpixels;
+	unsigned char *outpixels, *outp;
 	int x, y;
 
 	if (width < in_image_rgba->width || height < in_image_rgba->height)
 		return false;
 
-	pixels = (unsigned char*)qmalloc(width * height * 4);
+	inpixels = in_image_rgba->pixels;
+	outpixels = (unsigned char*)qmalloc(width * height * 4);
+	outp = outpixels;
 
-/* FIXME - implement this properly later (no redundant overwriting, stretch edge pixels instead of filling with black) */
-	memset(pixels, 0, width * height * 4);
 	for (y = 0; y < in_image_rgba->height; y++)
 	{
-		for (x = 0; x < in_image_rgba->width; x++)
+		memcpy(outp, inpixels, in_image_rgba->width * 4);
+		outp += in_image_rgba->width * 4;
+		inpixels += in_image_rgba->width * 4;
+
+		for (x = in_image_rgba->width; x < width; x++, outp += 4)
 		{
-			pixels[(y*width+x)*4+0] = in_image_rgba->pixels[(y*in_image_rgba->width+x)*4+0];
-			pixels[(y*width+x)*4+1] = in_image_rgba->pixels[(y*in_image_rgba->width+x)*4+1];
-			pixels[(y*width+x)*4+2] = in_image_rgba->pixels[(y*in_image_rgba->width+x)*4+2];
-			pixels[(y*width+x)*4+3] = in_image_rgba->pixels[(y*in_image_rgba->width+x)*4+3];
+			outp[0] = outp[-4];
+			outp[1] = outp[-3];
+			outp[2] = outp[-2];
+			outp[3] = outp[-1];
 		}
 	}
+	for (; y < height; y++)
+	{
+		memcpy(outp, outp - width * 4, width * 4);
+		outp += width * 4;
+	}
+
+	if (out_image_rgba == in_image_rgba)
+		qfree(out_image_rgba->pixels);
 
 	out_image_rgba->width = width;
 	out_image_rgba->height = height;
-	out_image_rgba->pixels = pixels;
+	out_image_rgba->pixels = outpixels;
 	return true;
 }
 
-bool_t clone_image(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba)
+void image_drawpixel(image_rgba_t *image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
 {
-	unsigned char *pixels = (unsigned char*)qmalloc(in_image_rgba->width * in_image_rgba->height * 4);
-	if (!pixels)
-		return false;
-	memcpy(pixels, in_image_rgba->pixels, in_image_rgba->width * in_image_rgba->height * 4);
-	out_image_rgba->width = in_image_rgba->width;
-	out_image_rgba->height = in_image_rgba->height;
-	out_image_rgba->pixels = pixels;
-	return true;
+	unsigned char *ptr;
+	if (x < 0 || x >= image->width)
+		return;
+	if (y < 0 || y >= image->height)
+		return;
+	ptr = image->pixels + (y * image->width + x) * 4;
+	ptr[0] = r;
+	ptr[1] = g;
+	ptr[2] = b;
+	ptr[3] = 255;
+}
+
+void image_drawline(image_rgba_t *image, int x1, int y1, int x2, int y2, unsigned char r, unsigned char g, unsigned char b)
+{
+	int i, dx, dy, dxabs, dyabs, sdx, sdy, px, py;
+
+	if (x1 < 0 && x2 < 0) return;
+	if (y1 < 0 && y2 < 0) return;
+	if (x1 >= image->width && x2 >= image->width) return;
+	if (y1 >= image->height && y2 >= image->height) return;
+
+	dx = x2 - x1;
+	dy = y2 - y1;
+
+	dxabs = abs(dx);
+	dyabs = abs(dy);
+
+	sdx = (dx < 0) ? -1 : ((dx > 0) ? 1 : 0);
+	sdy = (dy < 0) ? -1 : ((dy > 0) ? 1 : 0);
+
+	px = x1;
+	py = y1;
+
+	image_drawpixel(image, px, py, r, g, b);
+
+	if (dxabs >= dyabs) /* line is more horizontal than vertical */
+	{
+		int y = dxabs >> 1;
+
+		for (i = 0; i < dxabs; i++)
+		{
+			y += dyabs;
+			if (y >= dxabs)
+			{
+				y -= dxabs;
+				py += sdy;
+			}
+			px += sdx;
+			image_drawpixel(image, px, py, r, g, b);
+		}
+	}
+	else /* line is more vertical than horizontal */
+	{
+		int x = dyabs >> 1;
+
+		for (i = 0; i < dyabs; i++)
+		{
+			x += dxabs;
+			if (x >= dyabs)
+			{
+				x -= dyabs;
+				px += sdx;
+			}
+			py += sdy;
+			image_drawpixel(image, px, py, r, g, b);
+		}
+	}
 }

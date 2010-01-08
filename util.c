@@ -115,7 +115,8 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 	fp = fopen(filename, "rb");
 	if (!fp)
 	{
-		*out_error = msprintf("Couldn't open file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Couldn't open file: %s", strerror(errno));
 		return false;
 	}
 
@@ -123,7 +124,8 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 	ftellret = ftell(fp);
 	if (ftellret < 0) /* ftell returns -1L and sets errno on failure */
 	{
-		*out_error = msprintf("Couldn't seek to end of file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Couldn't seek to end of file: %s", strerror(errno));
 		fclose(fp);
 		return false;
 	}
@@ -133,7 +135,8 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 	filemem = (unsigned char*)qmalloc(filesize + 1);
 	if (!filemem)
 	{
-		*out_error = msprintf("Couldn't allocate memory to open file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Couldn't allocate memory to open file: %s", strerror(errno));
 		fclose(fp);
 		return false;
 	}
@@ -143,7 +146,8 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 
 	if (readsize < filesize)
 	{
-		*out_error = msprintf("Failed to read file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Failed to read file: %s", strerror(errno));
 		qfree(filemem);
 		return false;
 	}
@@ -162,10 +166,14 @@ bool_t writefile(const char *filename, const void *data, size_t size, char **out
 	FILE *fp;
 	size_t wrotesize;
 
+	if (out_error)
+		*out_error = NULL;
+
 	fp = fopen(filename, "wb");
 	if (!fp)
 	{
-		*out_error = msprintf("Couldn't open file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Couldn't open file: %s", strerror(errno));
 		return false;
 	}
 
@@ -174,7 +182,8 @@ bool_t writefile(const char *filename, const void *data, size_t size, char **out
 
 	if (wrotesize < size)
 	{
-		*out_error = msprintf("Failed to write file: %s", strerror(errno));
+		if (out_error)
+			*out_error = msprintf("Failed to write file: %s", strerror(errno));
 		return false;
 	}
 
@@ -326,4 +335,54 @@ void *getprocaddress(dllhandle_t handle, const char *name)
 #else
 	return (void*)dlsym(handle, name);
 #endif
+}
+
+typedef struct atexit_event_s
+{
+	void (*function)(void);
+
+	struct atexit_event_s *next;
+} atexit_event_t;
+
+static atexit_event_t *atexit_event_head = NULL;
+static atexit_event_t *atexit_event_tail = NULL;
+
+static void (*atexit_final_event)(void) = NULL;
+
+void add_atexit_event(void (*function)(void))
+{
+	atexit_event_t *e = (atexit_event_t*)qmalloc(sizeof(atexit_event_t));
+
+	e->function = function;
+	e->next = NULL;
+
+	if (!atexit_event_head)
+		atexit_event_head = e;
+	if (atexit_event_tail)
+		atexit_event_tail->next = e;
+	atexit_event_tail = e;
+}
+
+void set_atexit_final_event(void (*function)(void))
+{
+	if (atexit_final_event)
+	{
+		(*atexit_final_event)();
+		atexit_final_event = NULL;
+	}
+}
+
+void call_atexit_events(void)
+{
+	atexit_event_t *e, *next;
+
+	for (e = atexit_event_head; e; e = next)
+	{
+		next = e->next;
+		(*e->function)();
+		qfree(e);
+	}
+
+	atexit_event_head = NULL;
+	atexit_event_tail = NULL;
 }

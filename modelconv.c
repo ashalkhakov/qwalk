@@ -59,6 +59,7 @@ bool_t replacetexture(const char *filename)
 	char *error;
 	image_rgba_t image;
 	int i;
+	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
 	{
@@ -76,18 +77,13 @@ bool_t replacetexture(const char *filename)
 
 	qfree(filedata);
 
-	for (i = 0; i < model->num_meshes; i++)
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		image_free(&model->meshes[i].texture);
-		clone_image(&model->meshes[i].texture, &image); /* FIXME */
+		image_free(&mesh->texture_diffuse);
+		image_free(&mesh->texture_fullbright);
 
-	/* FIXME!!! */
-		image_free(&model->meshes[i].paddedtexture);
-		model->meshes[i].paddedtexture.width = 0;
-		model->meshes[i].paddedtexture.height = 0;
-		model->meshes[i].paddedtexture.pixels = NULL;
-
-		model->meshes[i].texture_handle = 0;
+		image_clone(&mesh->texture_diffuse, &image); /* FIXME */
+		image_createfill(&mesh->texture_fullbright, image.width, image.height, 0, 0, 0, 255);
 	}
 
 	image_free(&image);
@@ -110,9 +106,10 @@ model_t *loadmodel(const char *filename)
 
 	model = (model_t*)qmalloc(sizeof(model_t));
 
-	if (!model_load(filename, filedata, filesize, model))
+	if (!model_load(filename, filedata, filesize, model, &error))
 	{
-		fprintf(stderr, "Failed to load %s.\n", filename);
+		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
+		qfree(error);
 		qfree(model);
 		model = NULL;
 	}
@@ -224,7 +221,8 @@ int main(int argc, char **argv)
 	int i;
 	mesh_t *mesh;
 
-	atexit(dumpleaks);
+	set_atexit_final_event(dumpleaks);
+	atexit(call_atexit_events);
 
 	for (i = 1; i < argc; i++)
 	{
@@ -345,15 +343,18 @@ int main(int argc, char **argv)
 
 	if (texwidth > 0 && texheight > 0)
 	{
-		resize_image(&mesh->texture, texwidth, texheight);
+		image_resize(&mesh->texture_diffuse, texwidth, texheight);
+		image_resize(&mesh->texture_fullbright, texwidth, texheight);
 	}
 	else if (texwidth > 0)
 	{
-		resize_image(&mesh->texture, texwidth, mesh->texture.height);
+		image_resize(&mesh->texture_diffuse, texwidth, mesh->texture_diffuse.height);
+		image_resize(&mesh->texture_fullbright, texwidth, mesh->texture_fullbright.height);
 	}
 	else if (texheight > 0)
 	{
-		resize_image(&mesh->texture, mesh->texture.width, texheight);
+		image_resize(&mesh->texture_diffuse, mesh->texture_diffuse.width, texheight);
+		image_resize(&mesh->texture_fullbright, mesh->texture_fullbright.width, texheight);
 	}
 
 	if (!outfilename[0])

@@ -431,8 +431,14 @@ static unsigned char jpeg_eoi_marker[2] = { 0xFF, JPEG_EOI };
 static jmp_buf error_in_jpeg;
 /*static bool_t jpeg_toolarge;*/
 
-/* FIXME - add an atexit event to call jpeg_closelibrary */
-/* (that is, first code a list of atexit events...) */
+static void jpeg_closelibrary(void)
+{
+	unloadlibrary(&jpegdll);
+	jpegdll = NULL;
+
+	printf("Closed jpeg library.\n");
+}
+
 static bool_t jpeg_openlibrary(void)
 {
 	if (jpegdll)
@@ -451,13 +457,10 @@ static bool_t jpeg_openlibrary(void)
 		return false;
 #endif
 
-	return true;
-}
+	add_atexit_event(jpeg_closelibrary);
 
-static void jpeg_closelibrary(void)
-{
-	unloadlibrary(&jpegdll);
-	jpegdll = NULL;
+	printf("Opened jpeg library.\n");
+	return true;
 }
 
 /*
@@ -520,7 +523,10 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	int width, height;
 
 	if (!jpeg_openlibrary())
+	{
+		printf("Failed to load libjpeg.\n");
 		return false;
+	}
 
 	cinfo.err = qjpeg_std_error(&jerr);
 	qjpeg_create_decompress(&cinfo);
@@ -538,7 +544,6 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	if (width > 4096 || height > 4096 || width <= 0 || height <= 0)
 	{
 		printf("jpeg: bad dimensions\n");
-		jpeg_closelibrary();
 		return false;
 	}
 
@@ -606,7 +611,6 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	out_image->height = height;
 	out_image->pixels = image_buffer;
 
-	jpeg_closelibrary();
 	return true;
 
 error_caught:
@@ -617,6 +621,5 @@ error_caught:
 
 	qjpeg_destroy_decompress(&cinfo);
 
-	jpeg_closelibrary();
 	return false;
 }

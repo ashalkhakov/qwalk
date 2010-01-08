@@ -22,6 +22,9 @@
 #include "global.h"
 #include "model.h"
 
+extern const float anorms[162][3];
+int compress_normal(const float *normal);
+
 /* mdl_stvert_t::onseam */
 #define ALIAS_ONSEAM 0x0020
 
@@ -173,7 +176,7 @@ static void swap_mdl(void *filedata, size_t filesize)
 }
 
 /* FIXME - use some kind of stack memory system? */
-bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
+bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
 	mdl_header_t *header;
@@ -185,7 +188,6 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 	model_t model;
 	mesh_t *mesh;
 	mdl_meshvert_t *meshverts;
-	int pw, ph;
 	float iwidth, iheight;
 
 	header = (mdl_header_t*)f;
@@ -193,12 +195,14 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 /* validate format */
 	if (memcmp(header->id, "IDPO", 4) != 0)
 	{
-		printf("Wrong format (not IDPO).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (not IDPO)");
 		return false;
 	}
 	if (LittleLong(header->version) != 6)
 	{
-		printf("Wrong format (version not 6).\n");
+		if (out_error)
+			*out_error = msprintf("wrong format (version not 6)");
 		return false;
 	}
 
@@ -222,17 +226,21 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 			skins[i].skin = (unsigned char*)f;
 
 			f += header->skinwidth * header->skinheight;
-
-			printf("Read skin #%d (%dx%d).\n", i, header->skinwidth, header->skinheight);
 		}
 		else if (group == 1)
 		{
 		/* skingroup */
-			printf("MDL: skingroups not supported\n");
+			if (out_error)
+				*out_error = msprintf("skingroups not supported");
+			qfree(skins);
+			return false;
 		}
 		else
 		{
-			printf("MDL: bad skin type\n");
+			if (out_error)
+				*out_error = msprintf("bad skin type");
+			qfree(skins);
+			return false;
 		}
 	}
 
@@ -286,17 +294,21 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 		else if (type == 1)
 		{
 		/* framegroup */
-			printf("MDL: framegroups not supported\n");
+			if (out_error)
+				*out_error = msprintf("framegroups not supported");
+			qfree(frames);
+			qfree(skins);
+			return false;
 		}
 		else
 		{
-			printf("MDL: bad frame type\n");
+			if (out_error)
+				*out_error = msprintf("bad frame type");
+			qfree(frames);
+			qfree(skins);
+			return false;
 		}
 	}
-
-/* calculate padded skin size */
-	for (pw = 1; pw < header->skinwidth; pw <<= 1);
-	for (ph = 1; ph < header->skinheight; ph <<= 1);
 
 /* load into a real model */
 	model.num_frames = header->numframes;
@@ -318,8 +330,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 	model.synctype = header->synctype;
 
 	mesh = &model.meshes[0];
-
-	mesh->name = NULL;
+	mesh_initialize(mesh);
 
 	mesh->num_triangles = header->numtris;
 	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
@@ -374,26 +385,6 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 		mesh->texcoord2f[i*2+1] = (t + 0.5f) * iheight;
 	}
 
-	if (pw > header->skinwidth || ph > header->skinheight)
-	{
-		mesh->paddedtexcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
-		iwidth = 1.0f / pw;
-		iheight = 1.0f / ph;
-		for (i = 0; i < mesh->num_vertices; i++)
-		{
-			float s = (float)meshverts[i].s;
-			float t = (float)meshverts[i].t;
-
-			if (meshverts[i].back)
-				s += header->skinwidth >> 1;
-
-			mesh->paddedtexcoord2f[i*2+0] = (s + 0.5f) * iwidth;
-			mesh->paddedtexcoord2f[i*2+1] = (t + 0.5f) * iheight;
-		}
-	}
-	else
-		mesh->paddedtexcoord2f = NULL;
-
 	mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	mesh->normal3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	for (i = 0; i < model.num_frames; i++)
@@ -418,33 +409,43 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model)
 
 	qfree(meshverts);
 
-	mesh->texture.width = header->skinwidth;
-	mesh->texture.height = header->skinheight;
-	mesh->texture.pixels = (unsigned char*)qmalloc(mesh->texture.width * mesh->texture.height * 4);
+	mesh->texture_diffuse.width = header->skinwidth;
+	mesh->texture_diffuse.height = header->skinheight;
+	mesh->texture_diffuse.pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
+	mesh->texture_fullbright.width = header->skinwidth;
+	mesh->texture_fullbright.height = header->skinheight;
+	mesh->texture_fullbright.pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
 	for (i = 0; i < header->skinwidth * header->skinheight; i++)
 	{
-		mesh->texture.pixels[i*4+0] = quakepalette[skins[0].skin[i]*3+0];
-		mesh->texture.pixels[i*4+1] = quakepalette[skins[0].skin[i]*3+1];
-		mesh->texture.pixels[i*4+2] = quakepalette[skins[0].skin[i]*3+2];
-		mesh->texture.pixels[i*4+3] = 255;
-	}
+		if (skins[0].skin[i] < 256 - 32)
+		{
+		/* normal colour */
+			mesh->texture_diffuse.pixels[i*4+0] = quakepalette[skins[0].skin[i]*3+0];
+			mesh->texture_diffuse.pixels[i*4+1] = quakepalette[skins[0].skin[i]*3+1];
+			mesh->texture_diffuse.pixels[i*4+2] = quakepalette[skins[0].skin[i]*3+2];
+			mesh->texture_diffuse.pixels[i*4+3] = 255;
 
-	if (pw > header->skinwidth || ph > header->skinheight)
-	{
-		pad_image(&mesh->paddedtexture, &mesh->texture, pw, ph);
-	}
-	else
-	{
-		mesh->paddedtexture.width = 0;
-		mesh->paddedtexture.height = 0;
-		mesh->paddedtexture.pixels = NULL;
-	}
+			mesh->texture_fullbright.pixels[i*4+0] = 0;
+			mesh->texture_fullbright.pixels[i*4+1] = 0;
+			mesh->texture_fullbright.pixels[i*4+2] = 0;
+			mesh->texture_fullbright.pixels[i*4+3] = 255;
+		}
+		else
+		{
+		/* fullbright */
+			mesh->texture_diffuse.pixels[i*4+0] = 0;
+			mesh->texture_diffuse.pixels[i*4+1] = 0;
+			mesh->texture_diffuse.pixels[i*4+2] = 0;
+			mesh->texture_diffuse.pixels[i*4+3] = 255;
 
-	mesh->texture_handle = 0;
+			mesh->texture_fullbright.pixels[i*4+0] = quakepalette[skins[0].skin[i]*3+0];
+			mesh->texture_fullbright.pixels[i*4+1] = quakepalette[skins[0].skin[i]*3+1];
+			mesh->texture_fullbright.pixels[i*4+2] = quakepalette[skins[0].skin[i]*3+2];
+			mesh->texture_fullbright.pixels[i*4+3] = 255;
+		}
+	}
 
 	qfree(frames);
-/*	qfree(itriangles);*/
-/*	qfree(stverts);*/
 	qfree(skins);
 
 	*out_model = model;
@@ -473,7 +474,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	mesh = &model->meshes[0];
 
 /* create 8-bit texture */
-	palettize_image(&mesh->texture, quakepalette, &texture);
+	image_palettize(&mesh->texture_diffuse, &mesh->texture_fullbright, quakepalette, &texture);
 
 /* calculate bounds */
 	mins[0] = mins[1] = mins[2] = maxs[0] = maxs[1] = maxs[2] = 0.0f;
@@ -527,8 +528,8 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offsets[1] = 0; /* FIXME */
 	header->offsets[2] = 0; /* FIXME */
 	header->numskins = 1; /* FIXME */
-	header->skinwidth = mesh->texture.width;
-	header->skinheight = mesh->texture.height;
+	header->skinwidth = mesh->texture_diffuse.width;
+	header->skinheight = mesh->texture_diffuse.height;
 	header->numverts = mesh->num_vertices;
 	header->numtris = mesh->num_triangles;
 	header->numframes = model->num_frames;
@@ -636,7 +637,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	*out_data = data;
 	*out_size = f - (unsigned char*)data;
 
-/* print some compatibility notes */
+/* print some compatibility notes (FIXME - split out to a separate function so we can also analyze existing MDLs for compatibility issues) */
 	printf("Compatibility notes:\n");
 	i = 0;
 

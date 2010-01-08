@@ -46,6 +46,9 @@ bool_t mousedown = false;
 int mousedownx = 0;
 int mousedowny = 0;
 
+bool_t texturefiltering = false;
+bool_t firstperson = false;
+
 model_t *model;
 
 typedef struct r_state_s
@@ -73,77 +76,6 @@ void frame(void)
 		cam_pitch -= (y - mousedowny);
 		mousedownx = x;
 		mousedowny = y;
-	}
-}
-
-void draw_pixel(image_rgba_t *image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
-{
-	unsigned char *ptr;
-	if (x < 0 || x >= image->width)
-		return;
-	if (y < 0 || y >= image->height)
-		return;
-	ptr = image->pixels + (y * image->width + x) * 4;
-	ptr[0] = r;
-	ptr[1] = g;
-	ptr[2] = b;
-	ptr[3] = 255;
-}
-
-void draw_line(image_rgba_t *image, int x1, int y1, int x2, int y2, unsigned char r, unsigned char g, unsigned char b)
-{
-	int i, dx, dy, dxabs, dyabs, sdx, sdy, px, py;
-
-	if (x1 < 0 && x2 < 0) return;
-	if (y1 < 0 && y2 < 0) return;
-	if (x1 >= image->width && x2 >= image->width) return;
-	if (y1 >= image->height && y2 >= image->height) return;
-
-	dx = x2 - x1;
-	dy = y2 - y1;
-
-	dxabs = abs(dx);
-	dyabs = abs(dy);
-
-	sdx = (dx < 0) ? -1 : ((dx > 0) ? 1 : 0);
-	sdy = (dy < 0) ? -1 : ((dy > 0) ? 1 : 0);
-
-	px = x1;
-	py = y1;
-
-	draw_pixel(image, px, py, r, g, b);
-
-	if (dxabs >= dyabs) /* line is more horizontal than vertical */
-	{
-		int y = dxabs >> 1;
-
-		for (i = 0; i < dxabs; i++)
-		{
-			y += dyabs;
-			if (y >= dxabs)
-			{
-				y -= dxabs;
-				py += sdy;
-			}
-			px += sdx;
-			draw_pixel(image, px, py, r, g, b);
-		}
-	}
-	else /* line is more vertical than horizontal */
-	{
-		int x = dyabs >> 1;
-
-		for (i = 0; i < dyabs; i++)
-		{
-			x += dxabs;
-			if (x >= dyabs)
-			{
-				x -= dyabs;
-				px += sdx;
-			}
-			py += sdy;
-			draw_pixel(image, px, py, r, g, b);
-		}
 	}
 }
 
@@ -244,18 +176,30 @@ void r_init(void)
 	glDisable(GL_TEXTURE_2D); CHECKGLERROR();
 
 /* upload mesh textures */
+	model_generaterenderdata(model);
+
 	for (i = 0; i < model->num_meshes; i++)
 	{
 		mesh_t *mesh = &model->meshes[i];
-		const image_rgba_t *texture = mesh->paddedtexture.pixels ? &mesh->paddedtexture : &mesh->texture;
 
-		if (texture->pixels)
+		if (mesh->renderdata.texture_diffuse.pixels)
 		{
-			glGenTextures(1, &mesh->texture_handle); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->texture_handle); CHECKGLERROR();
-			glTexImage2D(GL_TEXTURE_2D, 0, 4, texture->width, texture->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture->pixels); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECKGLERROR();
+			glGenTextures(1, &mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
+			glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.texture_diffuse.width, mesh->renderdata.texture_diffuse.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.texture_diffuse.pixels); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECKGLERROR();
+		}
+
+		if (mesh->renderdata.texture_fullbright.pixels)
+		{
+			glGenTextures(1, &mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
+			glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.texture_fullbright.width, mesh->renderdata.texture_fullbright.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.texture_fullbright.pixels); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECKGLERROR();
 		}
@@ -264,25 +208,17 @@ void r_init(void)
 
 void animate_mesh(mesh_t *mesh, int frame)
 {
-	int i;
+	frame %= model->num_frames;
 
-	for (i = 0; i < mesh->num_vertices; i++)
-	{
-		r_state.vertex3f[i*3+0] = mesh->vertex3f[(frame*mesh->num_vertices+i)*3+0];
-		r_state.vertex3f[i*3+1] = mesh->vertex3f[(frame*mesh->num_vertices+i)*3+1];
-		r_state.vertex3f[i*3+2] = mesh->vertex3f[(frame*mesh->num_vertices+i)*3+2];
-
-		r_state.normal3f[i*3+0] = mesh->normal3f[(frame*mesh->num_vertices+i)*3+0];
-		r_state.normal3f[i*3+1] = mesh->normal3f[(frame*mesh->num_vertices+i)*3+1];
-		r_state.normal3f[i*3+2] = mesh->normal3f[(frame*mesh->num_vertices+i)*3+2];
-	}
+	memcpy(r_state.vertex3f, mesh->vertex3f + frame * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
+	memcpy(r_state.normal3f, mesh->normal3f + frame * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
 }
 
 /* linear interpolation */
 void animate_mesh_lerp(mesh_t *mesh, float frame)
 {
 	int i;
-	int frame0 = (int)floor(frame);
+	int frame0 = (int)floor(frame) % model->num_frames;
 	int frame1 = (frame0 + 1) % model->num_frames;
 	float t = frame - (float)frame0;
 	float it = 1.0f - t;
@@ -424,10 +360,17 @@ void render(void)
 		mat4x4f_concat_rotate(&ct, -90, 1, 0, 0);
 		mat4x4f_concat_rotate(&ct,  90, 0, 0, 1);
 
-		mat4x4f_create_identity(&viewmatrix);
-		mat4x4f_concat_translate(&viewmatrix, cam_dist, 0, 0);
-		mat4x4f_concat_rotate(&viewmatrix, cam_pitch, 0, 1, 0);
-		mat4x4f_concat_rotate(&viewmatrix, cam_yaw, 0, 0, 1);
+		if (firstperson)
+		{
+			mat4x4f_create_identity(&viewmatrix);
+		}
+		else
+		{
+			mat4x4f_create_identity(&viewmatrix);
+			mat4x4f_concat_translate(&viewmatrix, cam_dist, 0, 0);
+			mat4x4f_concat_rotate(&viewmatrix, cam_pitch, 0, 1, 0);
+			mat4x4f_concat_rotate(&viewmatrix, cam_yaw, 0, 0, 1);
+		}
 
 		mat4x4f_invert_simple(&invviewmatrix, &viewmatrix);
 
@@ -441,35 +384,67 @@ void render(void)
 	/*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);*/
 
 	frame = time * 10;
-	while (frame >= model->num_frames) /* FIXME - fmod? */
-		frame -= model->num_frames;
+	frame -= (float)floor(frame / model->num_frames) * model->num_frames;
 
 	for (i = 0; i < model->num_meshes; i++)
 	{
 		mesh_t *mesh = &model->meshes[i];
 
-		/*animate_mesh(mesh, (int)(time * 10) % model.num_frames);*/
+		/*animate_mesh(mesh, (int)(time * 10) % model->num_frames);*/
 		animate_mesh_lerp(mesh, frame);
 		light_mesh(mesh);
 
-		if (mesh->texture_handle)
+		glEnableClientState(GL_VERTEX_ARRAY); CHECKGLERROR();
+		glVertexPointer(3, GL_FLOAT, sizeof(float[3]), r_state.vertex3f); CHECKGLERROR();
+
+	/* draw diffuse pass */
+		if (mesh->renderdata.texture_diffuse_handle)
 		{
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->texture_handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
+
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.texcoord2f); CHECKGLERROR();
 		}
 		else
 		{
-			glDisable(GL_TEXTURE_2D);
+			glDisable(GL_TEXTURE_2D); CHECKGLERROR();
 		}
 
-	/* glDrawElements must take GL_UNSIGNED_INT, GL_INT is not accepted... */
-		glEnableClientState(GL_VERTEX_ARRAY); CHECKGLERROR();
-		glVertexPointer(3, GL_FLOAT, sizeof(float[3]), r_state.vertex3f); CHECKGLERROR();
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
-		glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->paddedtexcoord2f ? mesh->paddedtexcoord2f : mesh->texcoord2f); CHECKGLERROR();
 		glEnableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
 		glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned char[4]), r_state.colour4ub); CHECKGLERROR();
-		glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR();
+
+		glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR(); /* glDrawElements must take GL_UNSIGNED_INT, GL_INT is not accepted... */
+
+		glDisableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
+		if (mesh->renderdata.texture_diffuse_handle)
+		{
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
+		}
+
+	/* draw fullbright pass (who needs multitexture!) */
+		if (mesh->renderdata.texture_fullbright_handle)
+		{
+			glDepthFunc(GL_LEQUAL); CHECKGLERROR();
+			glBlendFunc(GL_ONE, GL_ONE); CHECKGLERROR();
+			glEnable(GL_BLEND); CHECKGLERROR();
+
+			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
+
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.texcoord2f); CHECKGLERROR();
+
+			glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR();
+
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
+
+			glDisable(GL_BLEND); CHECKGLERROR();
+			glDepthFunc(GL_LESS); CHECKGLERROR();
+		}
+
+	/* clean up */
+		glDisableClientState(GL_VERTEX_ARRAY); CHECKGLERROR();
 	}
 
 	glDisable(GL_TEXTURE_2D);
@@ -489,6 +464,29 @@ void render(void)
 
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+
+/* FIXME - do this properly (separate camera and model matrices) - this messed up lighting anyway */
+	glMatrixMode(GL_MODELVIEW);
+	{
+		mat4x4f_t ct, m;
+
+		mat4x4f_create_identity(&ct);
+		mat4x4f_concat_rotate(&ct, -90, 1, 0, 0);
+		mat4x4f_concat_rotate(&ct,  90, 0, 0, 1);
+
+		mat4x4f_create_identity(&viewmatrix);
+		mat4x4f_concat_translate(&viewmatrix, cam_dist, 0, 0);
+		mat4x4f_concat_rotate(&viewmatrix, cam_pitch, 0, 1, 0);
+		mat4x4f_concat_rotate(&viewmatrix, cam_yaw, 0, 0, 1);
+
+		mat4x4f_invert_simple(&invviewmatrix, &viewmatrix);
+
+		mat4x4f_concat(&m, &ct, &viewmatrix);
+
+		mat4x4f_transpose(&m);
+
+		glLoadMatrixf((float*)m.m);
+	}
 
 /* draw grid */
 	glDepthMask(GL_FALSE);
@@ -526,14 +524,18 @@ model_t *loadmodel(const char *filename)
 
 	model = (model_t*)qmalloc(sizeof(model_t));
 
-	if (!model_load(filename, filedata, filesize, model))
+	if (!model_load(filename, filedata, filesize, model, &error))
 	{
-		fprintf(stderr, "Failed to load %s.\n", filename);
+		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
+		qfree(error);
 		qfree(model);
-		model = NULL;
+		qfree(filedata);
+		return NULL;
 	}
 
 	qfree(filedata);
+
+	printf("Loaded %s.\n", filename);
 	return model;
 }
 
@@ -544,6 +546,7 @@ bool_t replacetexture(const char *filename)
 	char *error;
 	image_rgba_t image;
 	int i;
+	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
 	{
@@ -561,18 +564,13 @@ bool_t replacetexture(const char *filename)
 
 	qfree(filedata);
 
-	for (i = 0; i < model->num_meshes; i++)
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		image_free(&model->meshes[i].texture);
-		clone_image(&model->meshes[i].texture, &image); /* FIXME */
+		image_free(&mesh->texture_diffuse);
+		image_free(&mesh->texture_fullbright);
 
-	/* FIXME!!! */
-		image_free(&model->meshes[i].paddedtexture);
-		model->meshes[i].paddedtexture.width = 0;
-		model->meshes[i].paddedtexture.height = 0;
-		model->meshes[i].paddedtexture.pixels = NULL;
-
-		model->meshes[i].texture_handle = 0;
+		image_clone(&mesh->texture_diffuse, &image); /* FIXME */
+		image_createfill(&mesh->texture_fullbright, image.width, image.height, 0, 0, 0, 255);
 	}
 
 	image_free(&image);
@@ -588,39 +586,35 @@ void vandalize_skin(void)
 	{
 		for (j = 0; j < mesh->num_triangles; j++)
 		{
-			int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+0] * mesh->texture.width);
-			int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+1] * mesh->texture.height);
-			int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+0] * mesh->texture.width);
-			int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+1] * mesh->texture.height);
-			int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+0] * mesh->texture.width);
-			int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+1] * mesh->texture.height);
+			int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+0] * mesh->texture_diffuse.width);
+			int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+1] * mesh->texture_diffuse.height);
+			int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+0] * mesh->texture_diffuse.width);
+			int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+1] * mesh->texture_diffuse.height);
+			int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+0] * mesh->texture_diffuse.width);
+			int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+1] * mesh->texture_diffuse.height);
 
-			draw_line(&mesh->texture, s0, t0, s1, t1, 255, 255, 255);
-			draw_line(&mesh->texture, s1, t1, s2, t2, 255, 255, 255);
-			draw_line(&mesh->texture, s2, t2, s0, t2, 255, 255, 255);
+			image_drawline(&mesh->texture_diffuse, s0, t0, s1, t1, 255, 255, 255);
+			image_drawline(&mesh->texture_diffuse, s1, t1, s2, t2, 255, 255, 255);
+			image_drawline(&mesh->texture_diffuse, s2, t2, s0, t2, 255, 255, 255);
 		}
 	}
 }
 
-int g_fps = 0;
 void showfps(void)
 {
 	static float lastupdate = 0;
 	static unsigned int numframes = 0;
+	char s[64];
 
 	numframes++;
 
 	if (time - lastupdate >= 1.0f)
 	{
-		lastupdate = time;
-		g_fps = numframes;
-		numframes = 0;
+		sprintf(s, "%d fps", numframes);
+		SDL_WM_SetCaption(s, s);
 
-		{
-			char s[64];
-			sprintf(s, "%d fps", g_fps);
-			SDL_WM_SetCaption(s, s);
-		}
+		lastupdate = time;
+		numframes = 0;
 	}
 }
 
@@ -630,9 +624,11 @@ int main(int argc, char **argv)
 	int i;
 	char texfilename[1024] = {0};
 	char infilename[1024] = {0};
+	int width = 640, height = 480;
 	int bpp = 32;
 
-	atexit(dumpleaks);
+	set_atexit_final_event(dumpleaks);
+	atexit(call_atexit_events);
 
 	for (i = 1; i < argc; i++)
 	{
@@ -647,6 +643,38 @@ int main(int argc, char **argv)
 				}
 
 				strcpy(texfilename, argv[i]);
+			}
+			else if (!strcmp(argv[i], "-width"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-width'\n", argv[0]);
+					return 0;
+				}
+
+				width = (int)atoi(argv[i]);
+
+				if (width < 1 || width > 8192)
+				{
+					printf("%s: invalid value for option '-width'\n", argv[0]);
+					return 0;
+				}
+			}
+			else if (!strcmp(argv[i], "-height"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-height'\n", argv[0]);
+					return 0;
+				}
+
+				height = (int)atoi(argv[i]);
+
+				if (height < 1 || height > 8192)
+				{
+					printf("%s: invalid value for option '-height'\n", argv[0]);
+					return 0;
+				}
 			}
 			else if (!strcmp(argv[i], "-bpp"))
 			{
@@ -664,6 +692,14 @@ int main(int argc, char **argv)
 					return 0;
 				}
 			}
+			else if (!strcmp(argv[i], "-texturefiltering"))
+			{
+				texturefiltering = true;
+			}
+			else if (!strcmp(argv[i], "-firstperson"))
+			{
+				firstperson = true;
+			}
 			else
 			{
 				printf("%s: unrecognized option '%s'\n", argv[0], argv[i]);
@@ -678,7 +714,7 @@ int main(int argc, char **argv)
 
 	if (!infilename[0])
 	{
-		printf("usage: %s modelfile [-tex texturefile] [-bpp 16/32]\n", argv[0]);
+		printf("usage: %s modelfile [-tex texturefile] [-width 640] [-height 480] [-bpp 16/32] [-texturefiltering] [-firstperson]\n", argv[0]);
 		return 0;
 	}
 
@@ -716,7 +752,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!setvideomode(640, 480, bpp, false))
+	if (!setvideomode(width, height, bpp, false))
 		return 1;
 
 	for (done = false; !done; )

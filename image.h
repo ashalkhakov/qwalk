@@ -35,14 +35,18 @@ typedef struct image_paletted_s
 bool_t image_load(const char *filename, void *filedata, size_t filesize, image_rgba_t *out_image);
 void image_free(image_rgba_t *image);
 
+bool_t image_createfill(image_rgba_t *out_image_rgba, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 bool_t image_clone(image_rgba_t *dest, const image_rgba_t *source);
 
+bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 
-void palettize_image(const image_rgba_t *image_rgba, const unsigned char palette[768], image_paletted_t *out_image_paletted);
-void resize_image(image_rgba_t *image_rgba, int width, int height);
-bool_t pad_image(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height);
-bool_t clone_image(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba);
+void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const unsigned char palette[768], image_paletted_t *out_image_paletted);
+bool_t image_pad(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height);
+void image_resize(image_rgba_t *image_rgba, int width, int height);
+
+void image_drawpixel(image_rgba_t *image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
+void image_drawline(image_rgba_t *image, int x1, int y1, int x2, int y2, unsigned char r, unsigned char g, unsigned char b);
 
 #endif

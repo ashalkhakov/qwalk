@@ -45,14 +45,25 @@ typedef struct mesh_s
 	float *vertex3f; /* full set per frame */
 	float *normal3f; /* full set per frame */
 	float *texcoord2f;
-	float *paddedtexcoord2f;
 
 	int *triangle3i;
 
-	image_rgba_t texture;
-	image_rgba_t paddedtexture;
+	image_rgba_t texture_diffuse;
+	image_rgba_t texture_fullbright;
 
-	unsigned int texture_handle; /* hardware handle */
+	struct
+	{
+		bool_t initialized;
+
+	/* the texture may need to be padded to power-of-two dimensions to be rendered, so we need extra texturing information */
+		float *texcoord2f;
+
+		image_rgba_t texture_diffuse;
+		unsigned int texture_diffuse_handle;
+
+		image_rgba_t texture_fullbright;
+		unsigned int texture_fullbright_handle;
+	} renderdata;
 } mesh_t;
 
 typedef struct model_s
@@ -70,20 +81,24 @@ typedef struct model_s
 	int synctype; /* quake only */
 } model_t;
 
-extern const float anorms[162][3];
-int compress_normal(const float *normal);
+void mesh_initialize(mesh_t *mesh);
+void mesh_free(mesh_t *mesh);
+
+void model_initialize(model_t *model);
+void model_free(model_t *model);
 
 /* note that the filedata pointer is not const, because it may be modified (most likely by byteswapping) */
-bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model);
+bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error);
 
-bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model);
-bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model);
-bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model);
+bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
+bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
+bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 
 bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size);
 
-void model_free(model_t *model);
-
 mesh_t *model_merge_meshes(model_t *model);
+
+void model_generaterenderdata(model_t *model);
+void model_freerenderdata(model_t *model);
 
 #endif
