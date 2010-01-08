@@ -24,7 +24,7 @@
 bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 {
 	unsigned char *f = (unsigned char*)filedata;
-	unsigned char *endf = f + filesize;
+	/*unsigned char *endf = f + filesize;*/
 	char manufacturer;
 	char version;
 	char encoding;
