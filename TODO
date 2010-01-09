@@ -30,4 +30,3 @@
 - Modes to emulate certain engines' rendering exactly, including lighting,
   texture coordinate rounding, and crappy GLQuake texture resampling.
 - Optional stencil shadows mode.
-- Preview v_ models in 'first person mode', as they'd appear in game.
