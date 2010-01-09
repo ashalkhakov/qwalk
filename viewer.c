@@ -338,30 +338,29 @@ void animate_mesh(const mesh_t *mesh)
 
 void light_mesh(const mesh_t *mesh)
 {
-	float dir[3], tdir[3];
+	float lightpos[3], tlightpos[3], lightnormal[3], dot;
+	const float *v, *n;
 	int i;
+	unsigned char *c;
 
-	dir[0] = -viewmatrix.m[0][0];
-	dir[1] = -viewmatrix.m[1][0];
-	dir[2] = -viewmatrix.m[2][0];
+	lightpos[0] = viewmatrix.m[0][3];
+	lightpos[1] = viewmatrix.m[1][3];
+	lightpos[2] = viewmatrix.m[2][3];
 
-	mat4x4f_transform_3x3(&invmodelmatrix, dir, tdir);
+	mat4x4f_transform(&invmodelmatrix, lightpos, tlightpos);
 
-	for (i = 0; i < mesh->num_vertices; i++)
+	for (i = 0, v = r_state.vertex3f, n = r_state.normal3f, c = r_state.colour4ub; i < mesh->num_vertices; i++, v += 3, n += 3, c += 4)
 	{
-		float nx = r_state.normal3f[i*3+0];
-		float ny = r_state.normal3f[i*3+1];
-		float nz = r_state.normal3f[i*3+2];
+		VectorSubtract(tlightpos, v, lightnormal);
+		VectorNormalize(lightnormal);
 
-		float dot = tdir[0] * nx + tdir[1] * ny + tdir[2] * nz;
+		dot = DotProduct(n, lightnormal);
 
 		if (dot < 0)
 			dot = 0;
 
-		r_state.colour4ub[i*4+0] =
-		r_state.colour4ub[i*4+1] =
-		r_state.colour4ub[i*4+2] = (unsigned char)(dot * 255);
-		r_state.colour4ub[i*4+3] = 255;
+		c[0] = c[1] = c[2] = (unsigned char)(dot * 255);
+		c[3] = 255;
 	}
 }
 
