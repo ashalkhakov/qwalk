@@ -23,16 +23,25 @@
 #include "matrix.h"
 #include "image.h"
 
-typedef struct frameinfo_s
+typedef struct singleframe_s
 {
 	char *name;
+	int offset; /* how many "actual frames" into the vertex3f/normal3f lumps */
+} singleframe_t;
+
+typedef struct frameinfo_s
+{
+	int num_frames;
+	singleframe_t *frames;
+
+	float frametime; /* 0.1 for single frames, otherwise based on framegroup interval */
 } frameinfo_t;
 
 typedef struct tag_s
 {
 	char *name;
 
-	mat4x4f_t *matrix; /* one per frame */
+	mat4x4f_t *matrix;
 } tag_t;
 
 typedef struct mesh_s
@@ -42,8 +51,8 @@ typedef struct mesh_s
 	int num_vertices;
 	int num_triangles;
 
-	float *vertex3f; /* full set per frame */
-	float *normal3f; /* full set per frame */
+	float *vertex3f;
+	float *normal3f;
 	float *texcoord2f;
 
 	int *triangle3i;
@@ -68,6 +77,8 @@ typedef struct mesh_s
 
 typedef struct model_s
 {
+	int total_frames; /* including framegroup frames */
+
 	int num_frames;
 	frameinfo_t *frameinfo;
 

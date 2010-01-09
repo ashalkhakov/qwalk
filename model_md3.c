@@ -219,6 +219,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 	printf("header numskins: %d\n", header->num_skins);
 
 /* read frames */
+	model.total_frames = header->num_frames;
+
 	model.num_frames = header->num_frames;
 	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
 
@@ -227,8 +229,12 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 	{
 		md3_frameinfo_t *md3_frameinfo = (md3_frameinfo_t*)f;
 
-		model.frameinfo[i].name = (char*)qmalloc(strlen(md3_frameinfo->name) + 1);
-		strcpy(model.frameinfo[i].name, md3_frameinfo->name);
+		model.frameinfo[i].frametime = 0.1f;
+		model.frameinfo[i].num_frames = 1;
+		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
+		model.frameinfo[i].frames[0].name = (char*)qmalloc(strlen(md3_frameinfo->name) + 1);
+		strcpy(model.frameinfo[i].frames[0].name, md3_frameinfo->name);
+		model.frameinfo[i].frames[0].offset = i;
 
 		f += sizeof(md3_frameinfo_t);
 	}

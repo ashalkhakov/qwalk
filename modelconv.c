@@ -131,6 +131,7 @@ void dump_txt(const char *filename, const model_t *model)
 
 	fprintf(fp, "Analysis of %s\n\n", infilename);
 
+	fprintf(fp, "total_frames = %d\n", model->total_frames);
 	fprintf(fp, "num_frames = %d\n", model->num_frames);
 	fprintf(fp, "num_tags = %d\n", model->num_tags);
 	fprintf(fp, "num_meshes = %d\n", model->num_meshes);
@@ -143,7 +144,18 @@ void dump_txt(const char *filename, const model_t *model)
 	{
 		const frameinfo_t *frameinfo = &model->frameinfo[i];
 
-		fprintf(fp, "%d { name = \"%s\" }\n", i, frameinfo->name);
+		if (frameinfo->num_frames == 1)
+			fprintf(fp, "%d { name = \"%s\" }\n", i, frameinfo->frames[0].name);
+		else
+		{
+			fprintf(fp, "%d {\n", i);
+			fprintf(fp, "\tframetime = %f,\n", frameinfo->frametime);
+			for (j = 0; j < frameinfo->num_frames; j++)
+			{
+				fprintf(fp, "\t{ name = \"%s\", offset = %d }\n", frameinfo->frames[j].name, frameinfo->frames[j].offset);
+			}
+			fprintf(fp, "}\n");
+		}
 	}
 	fprintf(fp, "\n");
 
@@ -157,7 +169,7 @@ void dump_txt(const char *filename, const model_t *model)
 		fprintf(fp, "%d {\n", i);
 		fprintf(fp, "\tname = \"%s\"\n", tag->name);
 		fprintf(fp, "\tframes = {\n");
-		for (j = 0; j < model->num_frames; j++)
+		for (j = 0; j < model->total_frames; j++)
 		{
 			fprintf(fp, "\t\t%d { %f %f %f %f, %f %f %f %f, %f %f %f %f, %f %f %f %f }\n", j, tag->matrix[j].m[0][0], tag->matrix[j].m[1][0], tag->matrix[j].m[2][0], tag->matrix[j].m[3][0], tag->matrix[j].m[0][1], tag->matrix[j].m[1][1], tag->matrix[j].m[2][1], tag->matrix[j].m[3][1], tag->matrix[j].m[0][2], tag->matrix[j].m[1][2], tag->matrix[j].m[2][2], tag->matrix[j].m[3][2], tag->matrix[j].m[0][3], tag->matrix[j].m[1][3], tag->matrix[j].m[2][3], tag->matrix[j].m[3][3]);
 		}
@@ -193,7 +205,7 @@ void dump_txt(const char *filename, const model_t *model)
 		fprintf(fp, "\t}\n");
 		fprintf(fp, "\n");
 		fprintf(fp, "\tframes = {\n");
-		for (j = 0; j < model->num_frames; j++)
+		for (j = 0; j < model->total_frames; j++)
 		{
 			const float *v = mesh->vertex3f + j * mesh->num_vertices * 3;
 			const float *n = mesh->normal3f + j * mesh->num_vertices * 3;

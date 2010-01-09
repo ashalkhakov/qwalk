@@ -53,13 +53,18 @@ void model_initialize(model_t *model)
 
 void model_free(model_t *model)
 {
-	int i;
+	int i, j;
 	frameinfo_t *frameinfo;
+	singleframe_t *singleframe;
 	tag_t *tag;
 	mesh_t *mesh;
 
 	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
-		qfree(frameinfo->name);
+	{
+		for (j = 0, singleframe = frameinfo->frames; j < frameinfo->num_frames; j++, singleframe++)
+			qfree(singleframe->name);
+		qfree(frameinfo->frames);
+	}
 	qfree(model->frameinfo);
 
 	for (i = 0, tag = model->tags; i < model->num_tags; i++, tag++)
@@ -172,14 +177,17 @@ mesh_t *model_merge_meshes(model_t *model)
 	newmesh = (mesh_t*)qmalloc(sizeof(mesh_t));
 	mesh_initialize(newmesh);
 
+	newmesh->name = (char*)qmalloc(strlen("merged") + 1);
+	strcpy(newmesh->name, "merged");
+
 	for (i = 0; i < model->num_meshes; i++)
 	{
 		newmesh->num_vertices += model->meshes[i].num_vertices;
 		newmesh->num_triangles += model->meshes[i].num_triangles;
 	}
 
-	newmesh->vertex3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->num_frames);
-	newmesh->normal3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->num_frames);
+	newmesh->vertex3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->total_frames);
+	newmesh->normal3f = (float*)qmalloc(sizeof(float[3]) * newmesh->num_vertices * model->total_frames);
 	newmesh->texcoord2f = (float*)qmalloc(sizeof(float[2]) * newmesh->num_vertices);
 	newmesh->triangle3i = (int*)qmalloc(sizeof(int[3]) * newmesh->num_triangles);
 
@@ -200,7 +208,7 @@ mesh_t *model_merge_meshes(model_t *model)
 
 		iv = mesh->vertex3f;
 		in = mesh->normal3f;
-		for (j = 0; j < model->num_frames; j++)
+		for (j = 0; j < model->total_frames; j++)
 		{
 			v = newmesh->vertex3f + j * newmesh->num_vertices * 3 + ofs_verts * 3;
 			n = newmesh->normal3f + j * newmesh->num_vertices * 3 + ofs_verts * 3;

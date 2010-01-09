@@ -52,6 +52,7 @@ bool_t texturefiltering = false;
 bool_t firstperson = false;
 bool_t nolerp = false;
 bool_t wireframe = false;
+int g_frame = -1;
 
 model_t *model;
 
@@ -210,39 +211,128 @@ void r_init(void)
 	}
 }
 
-void animate_mesh(const mesh_t *mesh, int frame)
-{
-	frame %= model->num_frames;
+float anim_progress = 0.0f;
 
-	memcpy(r_state.vertex3f, mesh->vertex3f + frame * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
-	memcpy(r_state.normal3f, mesh->normal3f + frame * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
+static struct
+{
+	int num_frames;
+
+	struct
+	{
+		int offset;
+		float frac;
+	} frames[2];
+} animblend;
+
+void calc_anim(void)
+{
+	if (g_frame != -1)
+	{
+	/* view an individual frame or framegroup */
+		const frameinfo_t *frameinfo = &model->frameinfo[g_frame];
+
+		if (frameinfo->num_frames > 1)
+		{
+		/* framegroup */
+			if (nolerp)
+			{
+				int frame = (int)(anim_progress / frameinfo->frametime) % frameinfo->num_frames;
+
+				animblend.num_frames = 1;
+				animblend.frames[0].offset = frameinfo->frames[frame].offset;
+				animblend.frames[0].frac = 1.0f;
+			}
+			else
+			{
+				float frame;
+				int frame0, frame1;
+
+				frame = anim_progress / frameinfo->frametime;
+				frame -= (float)floor(frame / frameinfo->num_frames) * frameinfo->num_frames;
+
+				frame0 = (int)floor(frame) % frameinfo->num_frames;
+				frame1 = (frame0 + 1) % frameinfo->num_frames;
+
+				animblend.num_frames = 2;
+				animblend.frames[0].offset = frameinfo->frames[frame0].offset;
+				animblend.frames[0].frac = 1.0f - (frame - (float)frame0);
+				animblend.frames[1].offset = frameinfo->frames[frame1].offset;
+				animblend.frames[1].frac = frame - (float)frame0;
+			}
+		}
+		else
+		{
+		/* single frame */
+			animblend.num_frames = 1;
+			animblend.frames[0].offset = frameinfo->frames[0].offset;
+			animblend.frames[0].frac = 1.0f;
+		}
+	}
+	else
+	{
+	/* loop through all animation frames */
+		if (nolerp)
+		{
+			int frame = (int)(anim_progress / 0.1f) % model->num_frames;
+
+			animblend.num_frames = 1;
+			animblend.frames[0].offset = model->frameinfo[frame].frames[0].offset;
+			animblend.frames[0].frac = 1.0f;
+		}
+		else
+		{
+			float frame;
+			int frame0, frame1;
+
+			frame = anim_progress / 0.1f;
+			frame -= (float)floor(frame / model->num_frames) * model->num_frames;
+
+			frame0 = (int)floor(frame) % model->num_frames;
+			frame1 = (frame0 + 1) % model->num_frames;
+
+			animblend.num_frames = 2;
+			animblend.frames[0].offset = model->frameinfo[frame0].frames[0].offset;
+			animblend.frames[0].frac = 1.0f - (frame - (float)frame0);
+			animblend.frames[1].offset = model->frameinfo[frame1].frames[0].offset;
+			animblend.frames[1].frac = frame - (float)frame0;
+		}
+	}
 }
 
-/* linear interpolation */
-void animate_mesh_lerp(const mesh_t *mesh, float frame)
+void animate_mesh(const mesh_t *mesh)
 {
-	int i;
-	int frame0 = (int)floor(frame) % model->num_frames;
-	int frame1 = (frame0 + 1) % model->num_frames;
-	float t = frame - (float)frame0;
-	float it = 1.0f - t;
-
-	for (i = 0; i < mesh->num_vertices; i++)
+	if (animblend.num_frames == 1)
 	{
-		const float *v0 = mesh->vertex3f + (frame0 * mesh->num_vertices + i) * 3;
-		const float *n0 = mesh->normal3f + (frame0 * mesh->num_vertices + i) * 3;
-		const float *v1 = mesh->vertex3f + (frame1 * mesh->num_vertices + i) * 3;
-		const float *n1 = mesh->normal3f + (frame1 * mesh->num_vertices + i) * 3;
+		int offset = animblend.frames[0].offset;
 
-		r_state.vertex3f[i*3+0] = v0[0] * it + v1[0] * t;
-		r_state.vertex3f[i*3+1] = v0[1] * it + v1[1] * t;
-		r_state.vertex3f[i*3+2] = v0[2] * it + v1[2] * t;
+		memcpy(r_state.vertex3f, mesh->vertex3f + offset * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
+		memcpy(r_state.normal3f, mesh->normal3f + offset * mesh->num_vertices * 3, mesh->num_vertices * sizeof(float[3]));
+	}
+	if (animblend.num_frames == 2)
+	{
+		int offset0 = animblend.frames[0].offset;
+		int offset1 = animblend.frames[1].offset;
+		float frac0 = animblend.frames[0].frac;
+		float frac1 = animblend.frames[1].frac;
+		int i;
 
-		r_state.normal3f[i*3+0] = n0[0] * it + n1[0] * t;
-		r_state.normal3f[i*3+1] = n0[1] * it + n1[1] * t;
-		r_state.normal3f[i*3+2] = n0[2] * it + n1[2] * t;
+		for (i = 0; i < mesh->num_vertices; i++)
+		{
+			const float *v0 = mesh->vertex3f + (offset0 * mesh->num_vertices + i) * 3;
+			const float *n0 = mesh->normal3f + (offset0 * mesh->num_vertices + i) * 3;
+			const float *v1 = mesh->vertex3f + (offset1 * mesh->num_vertices + i) * 3;
+			const float *n1 = mesh->normal3f + (offset1 * mesh->num_vertices + i) * 3;
 
-		/* TODO - normalize */
+			r_state.vertex3f[i*3+0] = v0[0] * frac0 + v1[0] * frac1;
+			r_state.vertex3f[i*3+1] = v0[1] * frac0 + v1[1] * frac1;
+			r_state.vertex3f[i*3+2] = v0[2] * frac0 + v1[2] * frac1;
+
+			r_state.normal3f[i*3+0] = n0[0] * frac0 + n1[0] * frac1;
+			r_state.normal3f[i*3+1] = n0[1] * frac0 + n1[1] * frac1;
+			r_state.normal3f[i*3+2] = n0[2] * frac0 + n1[2] * frac1;
+
+			/* TODO - renormalize? */
+		}
 	}
 }
 
@@ -296,11 +386,8 @@ void calculate_planes(mesh_t *mesh)
 	}
 }
 
-void draw_tags(float frame, float alpha)
+void draw_tags(float alpha)
 {
-	int frame0 = (int)floor(frame);
-	int frame1 = (frame0 + 1) % model->num_frames;
-	float t = frame - (float)frame0;
 	int i;
 
 	glBegin(GL_LINES);
@@ -309,7 +396,20 @@ void draw_tags(float frame, float alpha)
 		mat4x4f_t m;
 		float x, y, z;
 
-		mat4x4f_blend(&m, &model->tags[i].matrix[frame0], &model->tags[i].matrix[frame1], t);
+		if (animblend.num_frames == 2)
+		{
+			int offset0 = animblend.frames[0].offset;
+			int offset1 = animblend.frames[1].offset;
+			float t = animblend.frames[1].frac;
+
+			mat4x4f_blend(&m, &model->tags[i].matrix[offset0], &model->tags[i].matrix[offset1], t);
+		}
+		else
+		{
+			int offset = animblend.frames[0].offset;
+
+			m = model->tags[i].matrix[offset];
+		}
 
 		x = m.m[0][3];
 		y = m.m[1][3];
@@ -386,7 +486,6 @@ void setmodelmatrix(const mat4x4f_t *modelmatrix)
 void render(void)
 {
 	int i;
-	float frame;
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -410,23 +509,19 @@ void render(void)
 	else
 		setmodelmatrix(&mat4x4f_identity);
 
-	frame = time * 10;
-	frame -= (float)floor(frame / model->num_frames) * model->num_frames;
-
 	if (wireframe)
 	{
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDisable(GL_CULL_FACE);
 	}
 
+	calc_anim();
+
 	for (i = 0; i < model->num_meshes; i++)
 	{
 		const mesh_t *mesh = &model->meshes[i];
 
-		if (nolerp)
-			animate_mesh(mesh, (int)frame);
-		else
-			animate_mesh_lerp(mesh, frame);
+		animate_mesh(mesh);
 
 		if (!wireframe)
 			light_mesh(mesh);
@@ -503,11 +598,11 @@ void render(void)
 	glEnable(GL_BLEND);
 	glDepthMask(GL_FALSE);
 
-	draw_tags(frame, 1.0f);
+	draw_tags(1.0f);
 
 	glDepthFunc(GL_GEQUAL);
 
-	draw_tags(frame, 0.1f);
+	draw_tags(0.1f);
 
 	glDepthFunc(GL_LESS);
 
@@ -717,6 +812,22 @@ int main(int argc, char **argv)
 					return 0;
 				}
 			}
+			else if (!strcmp(argv[i], "-frame"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-frame'\n", argv[0]);
+					return 0;
+				}
+
+				g_frame = (int)atoi(argv[i]);
+
+				if (g_frame < 0) /* maximum bound will be checked after the model is loaded */
+				{
+					printf("%s: invalid value for option '-frame'\n", argv[0]);
+					return 0;
+				}
+			}
 			else if (!strcmp(argv[i], "-texturefiltering"))
 			{
 				texturefiltering = true;
@@ -747,13 +858,20 @@ int main(int argc, char **argv)
 
 	if (!infilename[0])
 	{
-		printf("usage: %s modelfile [-tex texturefile] [-width 640] [-height 480] [-bpp 16/32] [-texturefiltering] [-firstperson] [-nolerp] [-wireframe]\n", argv[0]);
+		printf("usage: %s modelfile [-tex texturefile] [-width 640] [-height 480] [-bpp 16/32] [-frame #] [-texturefiltering] [-firstperson] [-nolerp] [-wireframe]\n", argv[0]);
 		return 0;
 	}
 
 	model = loadmodel(infilename);
 	if (!model)
 		return 1;
+
+	if (g_frame >= 0 && g_frame >= model->num_frames)
+	{
+		printf("%s: frame %d does not exist (model has %d frames)\n", argv[0], g_frame, model->num_frames);
+		model_free(model);
+		return 0;
+	}
 
 	if (texfilename[0])
 	{
@@ -837,6 +955,8 @@ int main(int argc, char **argv)
 		frame();
 
 		render();
+
+		anim_progress += frametime;
 	}
 
 	model_free(model);
