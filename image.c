@@ -45,6 +45,10 @@ bool_t image_load(const char *filename, void *filedata, size_t filesize, image_r
 void image_free(image_rgba_t *image)
 {
 	qfree(image->pixels);
+
+	image->width = 0;
+	image->height = 0;
+	image->pixels = NULL;
 }
 
 bool_t image_createfill(image_rgba_t *out_image_rgba, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
@@ -103,23 +107,42 @@ static unsigned char palettize_colour(const palette_t *palette, bool_t fullbrigh
 void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const palette_t *palette, image_paletted_t *out_image_paletted)
 {
 	int i;
-	const unsigned char *in_diffuse, *in_fullbright;
-	unsigned char *out;
 
 	/*out_image_paletted->palette = *palette;*/
 	out_image_paletted->width = image_diffuse->width;
 	out_image_paletted->height = image_diffuse->height;
 	out_image_paletted->pixels = (unsigned char*)qmalloc(out_image_paletted->width * out_image_paletted->height);
 
-	in_diffuse = image_diffuse->pixels;
-	in_fullbright = image_fullbright->pixels;
-	out = out_image_paletted->pixels;
-	for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, in_fullbright += 4, out++)
+	if (image_diffuse && image_diffuse->pixels && image_fullbright && image_fullbright->pixels)
 	{
-		if (in_fullbright[0] || in_fullbright[1] || in_fullbright[2])
-			*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
-		else
+		const unsigned char *in_diffuse = image_diffuse->pixels;
+		const unsigned char *in_fullbright = image_fullbright->pixels;
+		unsigned char *out = out_image_paletted->pixels;
+		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, in_fullbright += 4, out++)
+		{
+			if (in_fullbright[0] || in_fullbright[1] || in_fullbright[2])
+				*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
+			else
+				*out = palettize_colour(palette, false, in_diffuse[0], in_diffuse[1], in_diffuse[2]);
+		}
+	}
+	else if (image_diffuse && image_diffuse->pixels)
+	{
+		const unsigned char *in_diffuse = image_diffuse->pixels;
+		unsigned char *out = out_image_paletted->pixels;
+		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, out++)
 			*out = palettize_colour(palette, false, in_diffuse[0], in_diffuse[1], in_diffuse[2]);
+	}
+	else if (image_fullbright && image_fullbright->pixels)
+	{
+		const unsigned char *in_fullbright = image_fullbright->pixels;
+		unsigned char *out = out_image_paletted->pixels;
+		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_fullbright += 4, out++)
+			*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
+	}
+	else
+	{
+		memcpy(out_image_paletted->pixels, 0, out_image_paletted->width * out_image_paletted->height);
 	}
 }
 

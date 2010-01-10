@@ -288,14 +288,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	qfree(meshverts);
 
-/* FIXME? */
-	mesh->texture_diffuse.width = 0;
-	mesh->texture_diffuse.height = 0;
-	mesh->texture_diffuse.pixels = NULL;
-
-	mesh->texture_fullbright.width = 0;
-	mesh->texture_fullbright.height = 0;
-	mesh->texture_fullbright.pixels = NULL;
+/* FIXME - load skin? */
 
 	*out_model = model;
 	return true;

@@ -161,7 +161,7 @@ void CHECKGLERROR_(const char *file, int line)
 
 void r_init(void)
 {
-	int i;
+	int i, j;
 
 	glClearColor(0, 0, 0, 0); CHECKGLERROR();
 	glClearDepth(1.0f); CHECKGLERROR();
@@ -187,26 +187,18 @@ void r_init(void)
 	{
 		mesh_t *mesh = &model->meshes[i];
 
-		if (mesh->renderdata.texture_diffuse.pixels)
+		for (j = 0; j < SKIN_NUMTYPES; j++)
 		{
-			glGenTextures(1, &mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
-			glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.texture_diffuse.width, mesh->renderdata.texture_diffuse.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.texture_diffuse.pixels); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECKGLERROR();
-		}
-
-		if (mesh->renderdata.texture_fullbright.pixels)
-		{
-			glGenTextures(1, &mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
-			glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.texture_fullbright.width, mesh->renderdata.texture_fullbright.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.texture_fullbright.pixels); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECKGLERROR();
+			if (mesh->renderdata.skins[j].image.pixels)
+			{
+				glGenTextures(1, &mesh->renderdata.skins[j].handle); CHECKGLERROR();
+				glBindTexture(GL_TEXTURE_2D, mesh->renderdata.skins[j].handle); CHECKGLERROR();
+				glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.skins[j].image.width, mesh->renderdata.skins[j].image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.skins[j].image.pixels); CHECKGLERROR();
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECKGLERROR();
+			}
 		}
 	}
 }
@@ -529,13 +521,13 @@ void render(void)
 		glVertexPointer(3, GL_FLOAT, sizeof(float[3]), r_state.vertex3f); CHECKGLERROR();
 
 	/* draw diffuse pass */
-		if (mesh->renderdata.texture_diffuse_handle && !wireframe)
+		if (mesh->renderdata.skins[SKIN_DIFFUSE].handle && !wireframe)
 		{
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_diffuse_handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.skins[SKIN_DIFFUSE].handle); CHECKGLERROR();
 
 			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
-			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.texcoord2f); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.skins[SKIN_DIFFUSE].texcoord2f); CHECKGLERROR();
 		}
 		else
 		{
@@ -554,23 +546,23 @@ void render(void)
 		{
 			glDisableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
 		}
-		if (mesh->renderdata.texture_diffuse_handle && !wireframe)
+		if (mesh->renderdata.skins[SKIN_DIFFUSE].handle && !wireframe)
 		{
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
 		}
 
 	/* draw fullbright pass (who needs multitexture!) */
-		if (mesh->renderdata.texture_fullbright_handle && !wireframe)
+		if (mesh->renderdata.skins[SKIN_FULLBRIGHT].handle && !wireframe)
 		{
 			glDepthFunc(GL_LEQUAL); CHECKGLERROR();
 			glBlendFunc(GL_ONE, GL_ONE); CHECKGLERROR();
 			glEnable(GL_BLEND); CHECKGLERROR();
 
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.texture_fullbright_handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.skins[SKIN_FULLBRIGHT].handle); CHECKGLERROR();
 
 			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
-			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.texcoord2f); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.skins[SKIN_FULLBRIGHT].texcoord2f); CHECKGLERROR();
 
 			glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR();
 
@@ -664,7 +656,7 @@ bool_t replacetexture(const char *filename)
 	size_t filesize;
 	char *error;
 	image_rgba_t image;
-	int i;
+	int i, j;
 	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
@@ -685,11 +677,10 @@ bool_t replacetexture(const char *filename)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		image_free(&mesh->texture_diffuse);
-		image_free(&mesh->texture_fullbright);
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+			image_free(&mesh->skins[j]); /* also clears width/height/pixels */
 
-		image_clone(&mesh->texture_diffuse, &image); /* FIXME */
-		image_createfill(&mesh->texture_fullbright, image.width, image.height, 0, 0, 0, 255);
+		image_clone(&mesh->skins[SKIN_DIFFUSE], &image);
 	}
 
 	image_free(&image);
@@ -703,18 +694,20 @@ void vandalize_skin(void)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
+		image_rgba_t *image = &mesh->skins[SKIN_DIFFUSE];
+
 		for (j = 0; j < mesh->num_triangles; j++)
 		{
-			int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+0] * mesh->texture_diffuse.width);
-			int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+1] * mesh->texture_diffuse.height);
-			int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+0] * mesh->texture_diffuse.width);
-			int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+1] * mesh->texture_diffuse.height);
-			int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+0] * mesh->texture_diffuse.width);
-			int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+1] * mesh->texture_diffuse.height);
+			int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+0] * image->width);
+			int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+0]*2+1] * image->height);
+			int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+0] * image->width);
+			int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+1]*2+1] * image->height);
+			int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+0] * image->width);
+			int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[j*3+2]*2+1] * image->height);
 
-			image_drawline(&mesh->texture_diffuse, s0, t0, s1, t1, 255, 255, 255);
-			image_drawline(&mesh->texture_diffuse, s1, t1, s2, t2, 255, 255, 255);
-			image_drawline(&mesh->texture_diffuse, s2, t2, s0, t2, 255, 255, 255);
+			image_drawline(image, s0, t0, s1, t1, 255, 255, 255);
+			image_drawline(image, s1, t1, s2, t2, 255, 255, 255);
+			image_drawline(image, s2, t2, s0, t2, 255, 255, 255);
 		}
 	}
 }

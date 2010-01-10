@@ -44,6 +44,14 @@ typedef struct tag_s
 	mat4x4f_t *matrix;
 } tag_t;
 
+typedef enum skintype_e
+{
+	SKIN_DIFFUSE = 0,
+	SKIN_FULLBRIGHT,
+
+	SKIN_NUMTYPES
+} skintype_t;
+
 typedef struct mesh_s
 {
 	char *name;
@@ -57,21 +65,20 @@ typedef struct mesh_s
 
 	int *triangle3i;
 
-	image_rgba_t texture_diffuse;
-	image_rgba_t texture_fullbright;
+	image_rgba_t skins[SKIN_NUMTYPES];
 
 	struct
 	{
 		bool_t initialized;
 
 	/* the texture may need to be padded to power-of-two dimensions to be rendered, so we need extra texturing information */
-		float *texcoord2f;
-
-		image_rgba_t texture_diffuse;
-		unsigned int texture_diffuse_handle;
-
-		image_rgba_t texture_fullbright;
-		unsigned int texture_fullbright_handle;
+	/* each texture layer might be a different size, so we may have multiple sets of differently-padded texcoords... */
+		struct
+		{
+			float *texcoord2f;
+			image_rgba_t image;
+			unsigned int handle;
+		} skins[SKIN_NUMTYPES];
 	} renderdata;
 } mesh_t;
 

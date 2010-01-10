@@ -28,73 +28,79 @@ void mesh_initialize(mesh_t *mesh)
 
 void mesh_free(mesh_t *mesh)
 {
+	int i;
+
 	qfree(mesh->name);
 	qfree(mesh->vertex3f);
 	qfree(mesh->normal3f);
 	qfree(mesh->texcoord2f);
 	qfree(mesh->triangle3i);
-	image_free(&mesh->texture_diffuse);
-	image_free(&mesh->texture_fullbright);
+
+	for (i = 0; i < SKIN_NUMTYPES; i++)
+		image_free(&mesh->skins[i]);
 
 	mesh_freerenderdata(mesh);
 }
 
 void mesh_generaterenderdata(mesh_t *mesh)
 {
+	int i, j;
 	int w, h;
 	float fw, fh;
-	int i;
 
 	if (mesh->renderdata.initialized)
 		return;
 
-	if (mesh->texture_diffuse.pixels && mesh->texture_fullbright.pixels)
+	for (i = 0; i < SKIN_NUMTYPES; i++)
 	{
-	/* pad the texture up to a power of two */
-		for (w = 1; w < mesh->texture_diffuse.width; w <<= 1);
-		for (h = 1; h < mesh->texture_diffuse.height; h <<= 1);
-
-		image_pad(&mesh->renderdata.texture_diffuse, &mesh->texture_diffuse, w, h);
-		image_pad(&mesh->renderdata.texture_fullbright, &mesh->texture_fullbright, w, h);
-
-	/* generate padded texcoords */
-		mesh->renderdata.texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
-
-		fw = (float)mesh->texture_diffuse.width / (float)w;
-		fh = (float)mesh->texture_diffuse.height / (float)h;
-		for (i = 0; i < mesh->num_vertices; i++)
+		if (mesh->skins[i].pixels)
 		{
-			mesh->renderdata.texcoord2f[i*2+0] = mesh->texcoord2f[i*2+0] * fw;
-			mesh->renderdata.texcoord2f[i*2+1] = mesh->texcoord2f[i*2+1] * fh;
+		/* pad the skin up to a power of two */
+			for (w = 1; w < mesh->skins[i].width; w <<= 1);
+			for (h = 1; h < mesh->skins[i].height; h <<= 1);
+
+		/* generate padded texcoords */
+			mesh->renderdata.skins[i].texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
+
+			fw = (float)mesh->skins[i].width / (float)w;
+			fh = (float)mesh->skins[i].height / (float)h;
+			for (j = 0; j < mesh->num_vertices; j++)
+			{
+				mesh->renderdata.skins[i].texcoord2f[j*2+0] = mesh->texcoord2f[j*2+0] * fw;
+				mesh->renderdata.skins[i].texcoord2f[j*2+1] = mesh->texcoord2f[j*2+1] * fh;
+			}
+
+		/* pad the skin image */
+			image_pad(&mesh->renderdata.skins[i].image, &mesh->skins[i], w, h);
 		}
-	}
-	else
-	{
-		mesh->renderdata.texture_diffuse.width = 0;
-		mesh->renderdata.texture_diffuse.height = 0;
-		mesh->renderdata.texture_diffuse.pixels = NULL;
+		else
+		{
+			mesh->renderdata.skins[i].texcoord2f = NULL;
+			mesh->renderdata.skins[i].image.width = 0;
+			mesh->renderdata.skins[i].image.height = 0;
+			mesh->renderdata.skins[i].image.pixels = NULL;
+		}
 
-		mesh->renderdata.texture_fullbright.width = 0;
-		mesh->renderdata.texture_fullbright.height = 0;
-		mesh->renderdata.texture_fullbright.pixels = NULL;
+		mesh->renderdata.skins[i].handle = 0;
 	}
-
-	mesh->renderdata.texture_diffuse_handle = 0;
-	mesh->renderdata.texture_fullbright_handle = 0;
 
 	mesh->renderdata.initialized = true;
 }
 
 void mesh_freerenderdata(mesh_t *mesh)
 {
+	int i;
+
 	if (!mesh->renderdata.initialized)
 		return;
 
-	image_free(&mesh->renderdata.texture_diffuse);
-	image_free(&mesh->renderdata.texture_fullbright);
-	qfree(mesh->renderdata.texcoord2f);
+	for (i = 0; i < SKIN_NUMTYPES; i++)
+	{
+		qfree(mesh->renderdata.skins[i].texcoord2f);
+		image_free(&mesh->renderdata.skins[i].image);
 
-/* FIXME - release the uploaded texture */
+	/* FIXME - release the uploaded texture */
+	}
 }
 
 void model_initialize(model_t *model)
@@ -241,8 +247,9 @@ mesh_t *model_merge_meshes(model_t *model)
 		ofs_tris += mesh->num_triangles;
 	}
 
-	image_clone(&newmesh->texture_diffuse, &model->meshes[0].texture_diffuse); /* FIXME */
-	image_clone(&newmesh->texture_fullbright, &model->meshes[0].texture_fullbright);
+	for (i = 0; i < SKIN_NUMTYPES; i++)
+		if (model->meshes[0].skins[i].pixels)
+			image_clone(&newmesh->skins[i], &model->meshes[0].skins[i]);
 
 	for (i = 0; i < model->num_meshes; i++)
 		mesh_free(&model->meshes[i]);

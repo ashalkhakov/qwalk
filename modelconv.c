@@ -58,7 +58,7 @@ bool_t replacetexture(const char *filename)
 	size_t filesize;
 	char *error;
 	image_rgba_t image;
-	int i;
+	int i, j;
 	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
@@ -79,11 +79,10 @@ bool_t replacetexture(const char *filename)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		image_free(&mesh->texture_diffuse);
-		image_free(&mesh->texture_fullbright);
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+			image_free(&mesh->skins[j]); /* also clears width/height/pixels */
 
-		image_clone(&mesh->texture_diffuse, &image); /* FIXME */
-		image_createfill(&mesh->texture_fullbright, image.width, image.height, 0, 0, 0, 255);
+		image_clone(&mesh->skins[SKIN_DIFFUSE], &image);
 	}
 
 	image_free(&image);
@@ -355,18 +354,18 @@ int main(int argc, char **argv)
 
 	if (texwidth > 0 && texheight > 0)
 	{
-		image_resize(&mesh->texture_diffuse, texwidth, texheight);
-		image_resize(&mesh->texture_fullbright, texwidth, texheight);
+		for (i = 0; i < SKIN_NUMTYPES; i++)
+			image_resize(&mesh->skins[i], texwidth, texheight);
 	}
 	else if (texwidth > 0)
 	{
-		image_resize(&mesh->texture_diffuse, texwidth, mesh->texture_diffuse.height);
-		image_resize(&mesh->texture_fullbright, texwidth, mesh->texture_fullbright.height);
+		for (i = 0; i < SKIN_NUMTYPES; i++)
+			image_resize(&mesh->skins[i], texwidth, mesh->skins[i].height);
 	}
 	else if (texheight > 0)
 	{
-		image_resize(&mesh->texture_diffuse, mesh->texture_diffuse.width, texheight);
-		image_resize(&mesh->texture_fullbright, mesh->texture_fullbright.width, texheight);
+		for (i = 0; i < SKIN_NUMTYPES; i++)
+			image_resize(&mesh->skins[i], mesh->skins[i].width, texheight);
 	}
 
 	if (!outfilename[0])

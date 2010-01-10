@@ -476,12 +476,12 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	qfree(meshverts);
 	qfree(framevertstart);
 
-	mesh->texture_diffuse.width = header->skinwidth;
-	mesh->texture_diffuse.height = header->skinheight;
-	mesh->texture_diffuse.pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
-	mesh->texture_fullbright.width = header->skinwidth;
-	mesh->texture_fullbright.height = header->skinheight;
-	mesh->texture_fullbright.pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
+	mesh->skins[SKIN_DIFFUSE].width = header->skinwidth;
+	mesh->skins[SKIN_DIFFUSE].height = header->skinheight;
+	mesh->skins[SKIN_DIFFUSE].pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
+	mesh->skins[SKIN_FULLBRIGHT].width = header->skinwidth;
+	mesh->skins[SKIN_FULLBRIGHT].height = header->skinheight;
+	mesh->skins[SKIN_FULLBRIGHT].pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
 	for (i = 0; i < header->skinwidth * header->skinheight; i++)
 	{
 		unsigned char c = skins[0].skin[i];
@@ -489,28 +489,28 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		if (quakepalette.fullbright_flags[c >> 5] & (1U << (c & 31)))
 		{
 		/* fullbright */
-			mesh->texture_diffuse.pixels[i*4+0] = 0;
-			mesh->texture_diffuse.pixels[i*4+1] = 0;
-			mesh->texture_diffuse.pixels[i*4+2] = 0;
-			mesh->texture_diffuse.pixels[i*4+3] = 255;
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+0] = 0;
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+1] = 0;
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+2] = 0;
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+3] = 255;
 
-			mesh->texture_fullbright.pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->texture_fullbright.pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->texture_fullbright.pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->texture_fullbright.pixels[i*4+3] = 255;
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+0] = quakepalette.rgb[c*3+0];
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+1] = quakepalette.rgb[c*3+1];
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+2] = quakepalette.rgb[c*3+2];
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+3] = 255;
 		}
 		else
 		{
 		/* normal colour */
-			mesh->texture_diffuse.pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->texture_diffuse.pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->texture_diffuse.pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->texture_diffuse.pixels[i*4+3] = 255;
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+0] = quakepalette.rgb[c*3+0];
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+1] = quakepalette.rgb[c*3+1];
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+2] = quakepalette.rgb[c*3+2];
+			mesh->skins[SKIN_DIFFUSE].pixels[i*4+3] = 255;
 
-			mesh->texture_fullbright.pixels[i*4+0] = 0;
-			mesh->texture_fullbright.pixels[i*4+1] = 0;
-			mesh->texture_fullbright.pixels[i*4+2] = 0;
-			mesh->texture_fullbright.pixels[i*4+3] = 255;
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+0] = 0;
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+1] = 0;
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+2] = 0;
+			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+3] = 255;
 		}
 	}
 
@@ -539,10 +539,12 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		return false;
 	}
 
+	/* FIXME - resample fullbright skin to match diffuse skin size */
+
 	mesh = &model->meshes[0];
 
 /* create 8-bit texture */
-	image_palettize(&mesh->texture_diffuse, &mesh->texture_fullbright, &quakepalette, &texture);
+	image_palettize(&mesh->skins[SKIN_DIFFUSE], &mesh->skins[SKIN_FULLBRIGHT], &quakepalette, &texture);
 
 /* calculate bounds */
 	mins[0] = mins[1] = mins[2] = maxs[0] = maxs[1] = maxs[2] = 0.0f;
@@ -596,8 +598,8 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offsets[1] = 0; /* FIXME */
 	header->offsets[2] = 0; /* FIXME */
 	header->numskins = 1; /* FIXME */
-	header->skinwidth = mesh->texture_diffuse.width;
-	header->skinheight = mesh->texture_diffuse.height;
+	header->skinwidth = mesh->skins[SKIN_DIFFUSE].width;
+	header->skinheight = mesh->skins[SKIN_DIFFUSE].height;
 	header->numverts = mesh->num_vertices;
 	header->numtris = mesh->num_triangles;
 	header->numframes = model->num_frames;
