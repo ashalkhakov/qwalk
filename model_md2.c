@@ -200,8 +200,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
 		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = (char*)qmalloc(strlen(frame->name) + 1);
-		strcpy(model.frameinfo[i].frames[0].name, frame->name);
+		model.frameinfo[i].frames[0].name = copystring(frame->name);
 		model.frameinfo[i].frames[0].offset = i;
 	}
 
@@ -217,8 +216,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh = &model.meshes[0];
 	mesh_initialize(mesh);
 
-	mesh->name = (char*)qmalloc(strlen("md2mesh") + 1);
-	strcpy(mesh->name, "md2mesh");
+	mesh->name = copystring("md2mesh");
 
 	mesh->num_triangles = header->num_tris;
 	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);

@@ -66,22 +66,26 @@ float SwapFloat(float v)
 	return dat2.f;
 }
 
+char *copystring(const char *string)
+{
+	size_t size = strlen(string) + 1;
+	char *s = (char*)qmalloc(size);
+	if (s)
+		memcpy(s, string, size);
+	return s;
+}
+
 /* FIXME - do this properly */
 char *msprintf(const char *format, ...)
 {
 	va_list ap;
 	static char buffer[16384];
-	char *str;
 
 	va_start(ap, format);
 	vsprintf(buffer, format, ap);
 	va_end(ap);
 
-	str = (char*)qmalloc(strlen(buffer) + 1);
-	if (str == NULL)
-		return NULL;
-	strcpy(str, buffer);
-	return str;
+	return copystring(buffer);
 }
 
 void strlcpy(char *dest, const char *src, size_t size)

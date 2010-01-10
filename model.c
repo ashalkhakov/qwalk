@@ -177,8 +177,7 @@ mesh_t *model_merge_meshes(model_t *model)
 	newmesh = (mesh_t*)qmalloc(sizeof(mesh_t));
 	mesh_initialize(newmesh);
 
-	newmesh->name = (char*)qmalloc(strlen("merged") + 1);
-	strcpy(newmesh->name, "merged");
+	newmesh->name = copystring("merged");
 
 	for (i = 0; i < model->num_meshes; i++)
 	{

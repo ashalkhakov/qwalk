@@ -232,8 +232,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
 		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = (char*)qmalloc(strlen(md3_frameinfo->name) + 1);
-		strcpy(model.frameinfo[i].frames[0].name, md3_frameinfo->name);
+		model.frameinfo[i].frames[0].name = copystring(md3_frameinfo->name);
 		model.frameinfo[i].frames[0].offset = i;
 
 		f += sizeof(md3_frameinfo_t);
@@ -254,10 +253,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 			tag_t *tag = &model.tags[j];
 
 			if (i == 0)
-			{
-				tag->name = (char*)qmalloc(strlen(md3_tag->name) + 1);
-				strcpy(tag->name, md3_tag->name);
-			}
+				tag->name = copystring(md3_tag->name);
 
 			tag->matrix[i].m[0][0] = md3_tag->rotationmatrix[0];
 			tag->matrix[i].m[0][1] = md3_tag->rotationmatrix[3];
@@ -303,8 +299,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		mesh_initialize(mesh);
 
-		mesh->name = (char*)qmalloc(strlen(md3_mesh->name) + 1);
-		strcpy(mesh->name, md3_mesh->name);
+		mesh->name = copystring(md3_mesh->name);
 
 		mesh->num_vertices = md3_mesh->num_vertices;
 		mesh->num_triangles = md3_mesh->num_triangles;

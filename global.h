@@ -59,6 +59,7 @@ void *qmalloc_(size_t numbytes, const char *file, int line);
 void qfree(void *mem);
 void dumpleaks(void);
 
+char *copystring(const char *string);
 char *msprintf(const char *format, ...);
 void strlcpy(char *dest, const char *src, size_t size);
 

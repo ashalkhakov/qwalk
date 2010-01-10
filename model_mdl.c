@@ -372,8 +372,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			daliasframe_t *sframe = (daliasframe_t*)f;
 			f += sizeof(daliasframe_t);
 
-			model.frameinfo[i].frames[j].name = (char*)qmalloc(strlen(sframe->name) + 1);
-			strcpy(model.frameinfo[i].frames[j].name, sframe->name);
+			model.frameinfo[i].frames[j].name = copystring(sframe->name);
 
 			framevertstart[model.frameinfo[i].frames[j].offset] = (mdl_trivertx_t*)f;
 			f += header->numverts * sizeof(mdl_trivertx_t);
@@ -394,8 +393,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh = &model.meshes[0];
 	mesh_initialize(mesh);
 
-	mesh->name = (char*)qmalloc(strlen("mdlmesh") + 1);
-	strcpy(mesh->name, "mdlmesh");
+	mesh->name = copystring("mdlmesh");
 
 	mesh->num_triangles = header->numtris;
 	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
