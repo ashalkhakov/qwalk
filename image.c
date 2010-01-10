@@ -78,21 +78,17 @@ bool_t image_clone(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rg
 	return true;
 }
 
-/* which palette entries are fullbrights. currently the last 32 colours are fullbright. TODO - you should be able to load a colormap with any
- * configuration of fullbrights. */
-static const unsigned int fullbright_flags[8] = { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF };
-
-static unsigned char palettize_colour(const unsigned char palette[768], bool_t fullbright, unsigned char r, unsigned char g, unsigned char b)
+static unsigned char palettize_colour(const palette_t *palette, bool_t fullbright, unsigned char r, unsigned char g, unsigned char b)
 {
 	int i, dist;
 	int besti = -1, bestdist;
 
 	for (i = 0; i < 256; i++)
 	{
-		if (fullbright != !!(fullbright_flags[i >> 5] & (1U << (i & 31))))
+		if (fullbright != !!(palette->fullbright_flags[i >> 5] & (1U << (i & 31))))
 			continue;
 
-		dist = abs(palette[i*3+0] - r) + abs(palette[i*3+1] - g) + abs(palette[i*3+2] - b);
+		dist = abs(palette->rgb[i*3+0] - r) + abs(palette->rgb[i*3+1] - g) + abs(palette->rgb[i*3+2] - b);
 
 		if (besti == -1 || dist < bestdist)
 		{
@@ -104,12 +100,13 @@ static unsigned char palettize_colour(const unsigned char palette[768], bool_t f
 	return (besti != -1) ? besti : 0;
 }
 
-void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const unsigned char palette[768], image_paletted_t *out_image_paletted)
+void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const palette_t *palette, image_paletted_t *out_image_paletted)
 {
 	int i;
 	const unsigned char *in_diffuse, *in_fullbright;
 	unsigned char *out;
 
+	/*out_image_paletted->palette = *palette;*/
 	out_image_paletted->width = image_diffuse->width;
 	out_image_paletted->height = image_diffuse->height;
 	out_image_paletted->pixels = (unsigned char*)qmalloc(out_image_paletted->width * out_image_paletted->height);

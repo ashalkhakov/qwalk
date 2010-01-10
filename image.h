@@ -18,6 +18,12 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+typedef struct palette_s
+{
+	unsigned char rgb[768];
+	unsigned int fullbright_flags[8];
+} palette_t;
+
 /* 32-bit image */
 typedef struct image_rgba_s
 {
@@ -28,6 +34,8 @@ typedef struct image_rgba_s
 /* 8-bit (256 colour) paletted image */
 typedef struct image_paletted_s
 {
+	/*palette_t palette;*/
+
 	int width, height;
 	unsigned char *pixels;
 } image_paletted_t;
@@ -42,7 +50,7 @@ bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image);
 
-void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const unsigned char palette[768], image_paletted_t *out_image_paletted);
+void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const palette_t *palette, image_paletted_t *out_image_paletted);
 bool_t image_pad(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height);
 void image_resize(image_rgba_t *image_rgba, int width, int height);
 
