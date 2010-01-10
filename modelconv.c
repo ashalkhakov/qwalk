@@ -35,7 +35,7 @@ static int synctype = 0;
 
 static model_t *model = NULL;
 
-/*static*/ enum format { FMT_UNKNOWN = 0, FMT_MDL, FMT_TXT } /*outformat = FMT_UNKNOWN*/;
+/*static*/ enum format { FMT_UNKNOWN = 0, FMT_MDL, FMT_MD2, FMT_TXT } /*outformat = FMT_UNKNOWN*/;
 
 enum format identify_extension(const char *filename)
 {
@@ -45,6 +45,8 @@ enum format identify_extension(const char *filename)
 	{
 		if (!strcmp(ext, ".mdl"))
 			return FMT_MDL;
+		if (!strcmp(ext, ".md2"))
+			return FMT_MD2;
 		if (!strcmp(ext, ".txt"))
 			return FMT_TXT;
 	}
@@ -404,6 +406,28 @@ int main(int argc, char **argv)
 			else
 			{
 				printf("Failed to save model as mdl.\n");
+			}
+			break;
+		case FMT_MD2:
+			if (model_md2_save(model, &filedata, &filesize))
+			{
+				char *error;
+
+				if (!writefile(outfilename, filedata, filesize, &error))
+				{
+					printf("Failed to write %s: %s.\n", outfilename, error);
+					qfree(error);
+				}
+				else
+				{
+					printf("Saved %s.\n", outfilename);
+				}
+
+				qfree(filedata);
+			}
+			else
+			{
+				printf("Failed to save model as md2.\n");
 			}
 			break;
 		}

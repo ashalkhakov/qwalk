@@ -117,6 +117,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 
 bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size);
+bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size);
 
 mesh_t *model_merge_meshes(model_t *model);
 
