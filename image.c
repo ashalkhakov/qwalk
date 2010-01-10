@@ -82,7 +82,7 @@ bool_t image_clone(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rg
 	return true;
 }
 
-static unsigned char palettize_colour(const palette_t *palette, bool_t fullbright, unsigned char r, unsigned char g, unsigned char b)
+static unsigned char palettize_colour(const palette_t *palette, bool_t fullbright, const unsigned char rgb[3])
 {
 	int i, dist;
 	int besti = -1, bestdist;
@@ -92,7 +92,7 @@ static unsigned char palettize_colour(const palette_t *palette, bool_t fullbrigh
 		if (fullbright != !!(palette->fullbright_flags[i >> 5] & (1U << (i & 31))))
 			continue;
 
-		dist = abs(palette->rgb[i*3+0] - r) + abs(palette->rgb[i*3+1] - g) + abs(palette->rgb[i*3+2] - b);
+		dist = abs(palette->rgb[i*3+0] - rgb[0]) + abs(palette->rgb[i*3+1] - rgb[1]) + abs(palette->rgb[i*3+2] - rgb[2]);
 
 		if (besti == -1 || dist < bestdist)
 		{
@@ -121,9 +121,9 @@ void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *imag
 		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, in_fullbright += 4, out++)
 		{
 			if (in_fullbright[0] || in_fullbright[1] || in_fullbright[2])
-				*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
+				*out = palettize_colour(palette, true, in_fullbright);
 			else
-				*out = palettize_colour(palette, false, in_diffuse[0], in_diffuse[1], in_diffuse[2]);
+				*out = palettize_colour(palette, false, in_diffuse);
 		}
 	}
 	else if (image_diffuse && image_diffuse->pixels)
@@ -131,14 +131,14 @@ void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *imag
 		const unsigned char *in_diffuse = image_diffuse->pixels;
 		unsigned char *out = out_image_paletted->pixels;
 		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_diffuse += 4, out++)
-			*out = palettize_colour(palette, false, in_diffuse[0], in_diffuse[1], in_diffuse[2]);
+			*out = palettize_colour(palette, false, in_diffuse);
 	}
 	else if (image_fullbright && image_fullbright->pixels)
 	{
 		const unsigned char *in_fullbright = image_fullbright->pixels;
 		unsigned char *out = out_image_paletted->pixels;
 		for (i = 0; i < out_image_paletted->width * out_image_paletted->height; i++, in_fullbright += 4, out++)
-			*out = palettize_colour(palette, true, in_fullbright[0], in_fullbright[1], in_fullbright[2]);
+			*out = palettize_colour(palette, true, in_fullbright);
 	}
 	else
 	{
