@@ -189,11 +189,11 @@ void r_init(void)
 
 		for (j = 0; j < SKIN_NUMTYPES; j++)
 		{
-			if (mesh->renderdata.skins[j].image.pixels)
+			if (mesh->renderdata.skins[j].image)
 			{
 				glGenTextures(1, &mesh->renderdata.skins[j].handle); CHECKGLERROR();
 				glBindTexture(GL_TEXTURE_2D, mesh->renderdata.skins[j].handle); CHECKGLERROR();
-				glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.skins[j].image.width, mesh->renderdata.skins[j].image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.skins[j].image.pixels); CHECKGLERROR();
+				glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.skins[j].image->width, mesh->renderdata.skins[j].image->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.skins[j].image->pixels); CHECKGLERROR();
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
@@ -655,7 +655,7 @@ bool_t replacetexture(const char *filename)
 	void *filedata;
 	size_t filesize;
 	char *error;
-	image_rgba_t image;
+	image_rgba_t *image;
 	int i, j;
 	mesh_t *mesh;
 
@@ -666,7 +666,8 @@ bool_t replacetexture(const char *filename)
 		return false;
 	}
 
-	if (!image_load(filename, filedata, filesize, &image))
+	image = image_load(filename, filedata, filesize);
+	if (!image)
 	{
 		fprintf(stderr, "Failed to load %s.\n", filename);
 		qfree(filedata);
@@ -678,9 +679,9 @@ bool_t replacetexture(const char *filename)
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
 		for (j = 0; j < SKIN_NUMTYPES; j++)
-			image_free(&mesh->skins[j]); /* also clears width/height/pixels */
+			image_free(&mesh->skins[j]);
 
-		image_clone(&mesh->skins[SKIN_DIFFUSE], &image);
+		mesh->skins[SKIN_DIFFUSE] = image_clone(image);
 	}
 
 	image_free(&image);
@@ -694,7 +695,7 @@ void vandalize_skin(void)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		image_rgba_t *image = &mesh->skins[SKIN_DIFFUSE];
+		image_rgba_t *image = mesh->skins[SKIN_DIFFUSE];
 
 		for (j = 0; j < mesh->num_triangles; j++)
 		{

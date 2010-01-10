@@ -40,19 +40,21 @@ typedef struct image_paletted_s
 	unsigned char *pixels;
 } image_paletted_t;
 
-bool_t image_load(const char *filename, void *filedata, size_t filesize, image_rgba_t *out_image);
-void image_free(image_rgba_t *image);
+image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize);
 
-bool_t image_createfill(image_rgba_t *out_image_rgba, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
-bool_t image_clone(image_rgba_t *dest, const image_rgba_t *source);
+image_rgba_t *image_alloc(int width, int height);
+void image_free(image_rgba_t **image);
 
-bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image);
-bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image);
-bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image);
+image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+image_rgba_t *image_clone(const image_rgba_t *source);
 
-void image_palettize(const image_rgba_t *image_diffuse, const image_rgba_t *image_fullbright, const palette_t *palette, image_paletted_t *out_image_paletted);
-bool_t image_pad(image_rgba_t *out_image_rgba, const image_rgba_t *in_image_rgba, int width, int height);
-void image_resize(image_rgba_t *image_rgba, int width, int height);
+image_rgba_t *image_pcx_load(void *filedata, size_t filesize);
+image_rgba_t *image_tga_load(void *filedata, size_t filesize);
+image_rgba_t *image_jpeg_load(void *filedata, size_t filesize);
+
+image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
+image_rgba_t *image_pad(const image_rgba_t *source, int width, int height);
+image_rgba_t *image_resize(const image_rgba_t *source, int width, int height);
 
 void image_drawpixel(image_rgba_t *image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
 void image_drawline(image_rgba_t *image, int x1, int y1, int x2, int y2, unsigned char r, unsigned char g, unsigned char b);

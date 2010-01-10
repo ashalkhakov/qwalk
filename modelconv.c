@@ -57,7 +57,7 @@ bool_t replacetexture(const char *filename)
 	void *filedata;
 	size_t filesize;
 	char *error;
-	image_rgba_t image;
+	image_rgba_t *image;
 	int i, j;
 	mesh_t *mesh;
 
@@ -68,7 +68,8 @@ bool_t replacetexture(const char *filename)
 		return false;
 	}
 
-	if (!image_load(filename, filedata, filesize, &image))
+	image = image_load(filename, filedata, filesize);
+	if (!image)
 	{
 		fprintf(stderr, "Failed to load %s.\n", filename);
 		qfree(filedata);
@@ -80,9 +81,9 @@ bool_t replacetexture(const char *filename)
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
 		for (j = 0; j < SKIN_NUMTYPES; j++)
-			image_free(&mesh->skins[j]); /* also clears width/height/pixels */
+			image_free(&mesh->skins[j]);
 
-		image_clone(&mesh->skins[SKIN_DIFFUSE], &image);
+		mesh->skins[SKIN_DIFFUSE] = image_clone(image);
 	}
 
 	image_free(&image);
@@ -352,20 +353,17 @@ int main(int argc, char **argv)
 
 	mesh = model_merge_meshes(model);
 
-	if (texwidth > 0 && texheight > 0)
+	if (texwidth > 0 || texheight > 0)
 	{
 		for (i = 0; i < SKIN_NUMTYPES; i++)
-			image_resize(&mesh->skins[i], texwidth, texheight);
-	}
-	else if (texwidth > 0)
-	{
-		for (i = 0; i < SKIN_NUMTYPES; i++)
-			image_resize(&mesh->skins[i], texwidth, mesh->skins[i].height);
-	}
-	else if (texheight > 0)
-	{
-		for (i = 0; i < SKIN_NUMTYPES; i++)
-			image_resize(&mesh->skins[i], mesh->skins[i].width, texheight);
+		{
+			if (mesh->skins[i])
+			{
+				image_rgba_t *oldimage = mesh->skins[i];
+				mesh->skins[i] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
+				image_free(&oldimage);
+			}
+		}
 	}
 
 	if (!outfilename[0])

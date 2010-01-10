@@ -23,8 +23,9 @@
 #include "global.h"
 #include "image.h"
 
-bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
+image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 {
+	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
 	unsigned char *endf = f + filesize;
 	int id_length;
@@ -43,10 +44,10 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	bool_t compressed;
 	int x, y, readpixelcount, red, green, blue, alpha, runlen, row_inc;
 	unsigned char palette[256*4], *p;
-	unsigned char *outpixels, *pixbuf;
+	unsigned char *pixbuf;
 
 	if (filesize < 19)
-		return false;
+		return NULL;
 
 /* load header manually because not all of these values are aligned */
 	id_length       = f[0];
@@ -69,13 +70,13 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	if (width > 4096 || height > 4096 || width <= 0 || height <= 0)
 	{
 		printf("tga: bad dimensions\n");
-		return false;
+		return NULL;
 	}
 
 	if (attributes & 0x10) /* this bit indicates origin on the right, which we don't support */
 	{
 		printf("tga: bad origin (must be top left or bottom left)\n");
-		return false;
+		return NULL;
 	}
 
 /* if bit 5 of attributes isn't set, the image has been stored from bottom to top */
@@ -92,7 +93,7 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	{
 	default:
 		printf("tga: bad image type\n");
-		return false;
+		return NULL;
 
 	/* colormapped */
 	case 9: compressed = true;
@@ -100,24 +101,24 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		if (pixel_size != 8)
 		{
 			printf("tga: bad pixel_size\n");
-			return false;
+			return NULL;
 		}
 		if (colormap_length != 256)
 		{
 			printf("tga: bad colormap_length\n");
-			return false;
+			return NULL;
 		}
 		if (colormap_index != 0)
 		{
 			printf("tga: bad colormap_index\n");
-			return false;
+			return NULL;
 		}
 
 		switch (colormap_size)
 		{
 		default:
 			printf("tga: bad colormap_size\n");
-			return false;
+			return NULL;
 		case 24:
 			for (x = 0; x < colormap_length; x++)
 			{
@@ -138,21 +139,21 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 			break;
 		}
 
-		outpixels = (unsigned char*)qmalloc(width * height * 4);
-		if (!outpixels)
+		image = image_alloc(width, height);
+		if (!image)
 		{
 			printf("tga: out of memory\n");
-			return false;
+			return NULL;
 		}
 
 		if (bottom_to_top)
 		{
-			pixbuf = outpixels + (height - 1) * width * 4;
+			pixbuf = image->pixels + (height - 1) * width * 4;
 			row_inc = -width * 4 * 2;
 		}
 		else
 		{
-			pixbuf = outpixels;
+			pixbuf = image->pixels;
 			row_inc = 0;
 		}
 
@@ -250,24 +251,24 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		if (pixel_size != 24 && pixel_size != 32)
 		{
 			printf("tga: bad pixel_size\n");
-			return false;
+			return NULL;
 		}
 
-		outpixels = (unsigned char*)qmalloc(width * height * 4);
-		if (!outpixels)
+		image = image_alloc(width, height);
+		if (!image)
 		{
 			printf("tga: out of memory\n");
-			return false;
+			return NULL;
 		}
 
 		if (bottom_to_top)
 		{
-			pixbuf = outpixels + (height - 1) * width * 4;
+			pixbuf = image->pixels + (height - 1) * width * 4;
 			row_inc = -width * 4 * 2;
 		}
 		else
 		{
-			pixbuf = outpixels;
+			pixbuf = image->pixels;
 			row_inc = 0;
 		}
 
@@ -342,24 +343,24 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		if (pixel_size != 8)
 		{
 			printf("tga: bad pixel_size\n");
-			return false;
+			return NULL;
 		}
 
-		outpixels = (unsigned char*)qmalloc(width * height * 4);
-		if (!outpixels)
+		image = image_alloc(width, height);
+		if (!image)
 		{
 			printf("tga: out of memory\n");
-			return false;
+			return NULL;
 		}
 
 		if (bottom_to_top)
 		{
-			pixbuf = outpixels + (height - 1) * width * 4;
+			pixbuf = image->pixels + (height - 1) * width * 4;
 			row_inc = -width * 4 * 2;
 		}
 		else
 		{
-			pixbuf = outpixels;
+			pixbuf = image->pixels;
 			row_inc = 0;
 		}
 
@@ -418,8 +419,5 @@ bool_t image_tga_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		break;
 	}
 
-	out_image->width = width;
-	out_image->height = height;
-	out_image->pixels = outpixels;
-	return true;
+	return image;
 }

@@ -65,7 +65,7 @@ typedef struct mesh_s
 
 	int *triangle3i;
 
-	image_rgba_t skins[SKIN_NUMTYPES];
+	image_rgba_t *skins[SKIN_NUMTYPES];
 
 	struct
 	{
@@ -76,7 +76,7 @@ typedef struct mesh_s
 		struct
 		{
 			float *texcoord2f;
-			image_rgba_t image;
+			image_rgba_t *image;
 			unsigned int handle;
 		} skins[SKIN_NUMTYPES];
 	} renderdata;

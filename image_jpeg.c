@@ -514,18 +514,19 @@ static void JPEG_ErrorExit(j_common_ptr cinfo)
 	longjmp(error_in_jpeg, 1);
 }
 
-bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
+image_rgba_t *image_jpeg_load(void *filedata, size_t filesize)
 {
+	image_rgba_t *image = NULL;
 	struct jpeg_decompress_struct cinfo;
 	struct jpeg_error_mgr jerr;
-	unsigned char *image_buffer = NULL, *scanline = NULL;
+	unsigned char *scanline = NULL;
 	unsigned int line;
 	int width, height;
 
 	if (!jpeg_openlibrary())
 	{
 		printf("Failed to load libjpeg.\n");
-		return false;
+		return NULL;
 	}
 
 	cinfo.err = qjpeg_std_error(&jerr);
@@ -544,22 +545,22 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	if (width > 4096 || height > 4096 || width <= 0 || height <= 0)
 	{
 		printf("jpeg: bad dimensions\n");
-		return false;
+		return NULL;
 	}
 
-	image_buffer = (unsigned char*)qmalloc(width * height * 4);
+	image = image_alloc(width, height);
 	scanline = (unsigned char*)qmalloc(width * cinfo.output_components);
-	if (!image_buffer || !scanline)
+	if (!image || !scanline)
 	{
-		if (image_buffer)
-			qfree(image_buffer);
+		if (image)
+			image_free(&image);
 		if (scanline)
 			qfree(scanline);
 
 		printf("jpeg: out of memory\n");
 		qjpeg_finish_decompress(&cinfo);
 		qjpeg_destroy_decompress(&cinfo);
-		return false;
+		return NULL;
 	}
 
 /* decompress the image, line by line */
@@ -576,7 +577,7 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		{
 		/* RGB images */
 		case 3:
-			buffer_ptr = &image_buffer[width * line * 4];
+			buffer_ptr = &image->pixels[width * line * 4];
 			for (ind = 0; ind < width * 3; ind += 3, buffer_ptr += 4)
 			{
 				buffer_ptr[0] = scanline[ind];
@@ -589,7 +590,7 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		/* greyscale images (default to it, just in case) */
 		case 1:
 		default:
-			buffer_ptr = &image_buffer[width * line * 4];
+			buffer_ptr = &image->pixels[width * line * 4];
 			for (ind = 0; ind < width; ind++, buffer_ptr += 4)
 			{
 				buffer_ptr[0] = scanline[ind];
@@ -607,19 +608,15 @@ bool_t image_jpeg_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	qjpeg_finish_decompress(&cinfo);
 	qjpeg_destroy_decompress(&cinfo);
 
-	out_image->width = width;
-	out_image->height = height;
-	out_image->pixels = image_buffer;
-
-	return true;
+	return image;
 
 error_caught:
 	if (scanline)
 		qfree(scanline);
-	if (image_buffer)
-		qfree(image_buffer);
+	if (image)
+		image_free(&image);
 
 	qjpeg_destroy_decompress(&cinfo);
 
-	return false;
+	return NULL;
 }

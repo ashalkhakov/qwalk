@@ -53,17 +53,17 @@ void mesh_generaterenderdata(mesh_t *mesh)
 
 	for (i = 0; i < SKIN_NUMTYPES; i++)
 	{
-		if (mesh->skins[i].pixels)
+		if (mesh->skins[i])
 		{
 		/* pad the skin up to a power of two */
-			for (w = 1; w < mesh->skins[i].width; w <<= 1);
-			for (h = 1; h < mesh->skins[i].height; h <<= 1);
+			for (w = 1; w < mesh->skins[i]->width; w <<= 1);
+			for (h = 1; h < mesh->skins[i]->height; h <<= 1);
 
 		/* generate padded texcoords */
 			mesh->renderdata.skins[i].texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
 
-			fw = (float)mesh->skins[i].width / (float)w;
-			fh = (float)mesh->skins[i].height / (float)h;
+			fw = (float)mesh->skins[i]->width / (float)w;
+			fh = (float)mesh->skins[i]->height / (float)h;
 			for (j = 0; j < mesh->num_vertices; j++)
 			{
 				mesh->renderdata.skins[i].texcoord2f[j*2+0] = mesh->texcoord2f[j*2+0] * fw;
@@ -71,14 +71,12 @@ void mesh_generaterenderdata(mesh_t *mesh)
 			}
 
 		/* pad the skin image */
-			image_pad(&mesh->renderdata.skins[i].image, &mesh->skins[i], w, h);
+			mesh->renderdata.skins[i].image = image_pad(mesh->skins[i], w, h);
 		}
 		else
 		{
 			mesh->renderdata.skins[i].texcoord2f = NULL;
-			mesh->renderdata.skins[i].image.width = 0;
-			mesh->renderdata.skins[i].image.height = 0;
-			mesh->renderdata.skins[i].image.pixels = NULL;
+			mesh->renderdata.skins[i].image = NULL;
 		}
 
 		mesh->renderdata.skins[i].handle = 0;
@@ -248,8 +246,8 @@ mesh_t *model_merge_meshes(model_t *model)
 	}
 
 	for (i = 0; i < SKIN_NUMTYPES; i++)
-		if (model->meshes[0].skins[i].pixels)
-			image_clone(&newmesh->skins[i], &model->meshes[0].skins[i]);
+		if (model->meshes[0].skins[i])
+			newmesh->skins[i] = image_clone(model->meshes[0].skins[i]);
 
 	for (i = 0; i < model->num_meshes; i++)
 		mesh_free(&model->meshes[i]);

@@ -476,12 +476,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	qfree(meshverts);
 	qfree(framevertstart);
 
-	mesh->skins[SKIN_DIFFUSE].width = header->skinwidth;
-	mesh->skins[SKIN_DIFFUSE].height = header->skinheight;
-	mesh->skins[SKIN_DIFFUSE].pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
-	mesh->skins[SKIN_FULLBRIGHT].width = header->skinwidth;
-	mesh->skins[SKIN_FULLBRIGHT].height = header->skinheight;
-	mesh->skins[SKIN_FULLBRIGHT].pixels = (unsigned char*)qmalloc(header->skinwidth * header->skinheight * 4);
+	mesh->skins[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
+	mesh->skins[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
+
 	for (i = 0; i < header->skinwidth * header->skinheight; i++)
 	{
 		unsigned char c = skins[0].skin[i];
@@ -489,28 +486,28 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		if (quakepalette.fullbright_flags[c >> 5] & (1U << (c & 31)))
 		{
 		/* fullbright */
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+0] = 0;
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+1] = 0;
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+2] = 0;
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+3] = 255;
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+0] = 0;
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+1] = 0;
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+2] = 0;
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+3] = 255;
 
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+3] = 255;
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+0] = quakepalette.rgb[c*3+0];
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+1] = quakepalette.rgb[c*3+1];
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+2] = quakepalette.rgb[c*3+2];
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+3] = 255;
 		}
 		else
 		{
 		/* normal colour */
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->skins[SKIN_DIFFUSE].pixels[i*4+3] = 255;
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+0] = quakepalette.rgb[c*3+0];
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+1] = quakepalette.rgb[c*3+1];
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+2] = quakepalette.rgb[c*3+2];
+			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+3] = 255;
 
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+0] = 0;
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+1] = 0;
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+2] = 0;
-			mesh->skins[SKIN_FULLBRIGHT].pixels[i*4+3] = 255;
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+0] = 0;
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+1] = 0;
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+2] = 0;
+			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+3] = 255;
 		}
 	}
 
@@ -530,7 +527,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	float mins[3], maxs[3], dist[3], totalsize;
 	mdl_header_t *header;
 	int i, j, k;
-	image_paletted_t texture;
+	image_paletted_t *pimage;
 
 	if (model->num_meshes != 1)
 	{
@@ -544,7 +541,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	mesh = &model->meshes[0];
 
 /* create 8-bit texture */
-	image_palettize(&mesh->skins[SKIN_DIFFUSE], &mesh->skins[SKIN_FULLBRIGHT], &quakepalette, &texture);
+	pimage = image_palettize(&quakepalette, mesh->skins[SKIN_DIFFUSE], mesh->skins[SKIN_FULLBRIGHT]);
 
 /* calculate bounds */
 	mins[0] = mins[1] = mins[2] = maxs[0] = maxs[1] = maxs[2] = 0.0f;
@@ -598,8 +595,8 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offsets[1] = 0; /* FIXME */
 	header->offsets[2] = 0; /* FIXME */
 	header->numskins = 1; /* FIXME */
-	header->skinwidth = mesh->skins[SKIN_DIFFUSE].width;
-	header->skinheight = mesh->skins[SKIN_DIFFUSE].height;
+	header->skinwidth = pimage->width;
+	header->skinheight = pimage->height;
 	header->numverts = mesh->num_vertices;
 	header->numtris = mesh->num_triangles;
 	header->numframes = model->num_frames;
@@ -617,7 +614,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 
 		f += sizeof(mdl_skin_t) - sizeof(skin->skin);
 
-		memcpy(f, texture.pixels, header->skinwidth * header->skinheight);
+		memcpy(f, pimage->pixels, header->skinwidth * header->skinheight);
 		f += header->skinwidth * header->skinheight;
 	}
 
@@ -760,7 +757,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	}
 
 /* done */
-	qfree(texture.pixels);
+	qfree(pimage);
 
 	swap_mdl(data, f - (unsigned char*)data);
 	*out_data = data;

@@ -21,8 +21,9 @@
 #include "global.h"
 #include "image.h"
 
-bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
+image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
 {
+	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
 	/*unsigned char *endf = f + filesize;*/
 	char manufacturer;
@@ -42,13 +43,13 @@ bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	unsigned short palette_type;
 	char filler[58];
 	unsigned char *palette768;
-	unsigned char *outpixels, *pix;
+	unsigned char *pix;
 	int x, y;
 	unsigned char databyte;
 	int runlen;
 
 	if (filesize < 128)
-		return false;
+		return NULL;
 
 	manufacturer   = f[0];
 	version        = f[1];
@@ -72,37 +73,37 @@ bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	if (manufacturer != 0x0a)
 	{
 		printf("pcx: bad manufacturer\n");
-		return false;
+		return NULL;
 	}
 
 	if (version != 5)
 	{
 		printf("pcx: bad version\n");
-		return false;
+		return NULL;
 	}
 
 	if (encoding != 1)
 	{
 		printf("pcx: bad encoding\n");
-		return false;
+		return NULL;
 	}
 
 	if (bits_per_pixel != 8)
 	{
 		printf("pcx: bad bits_per_pixel\n");
-		return false;
+		return NULL;
 	}
 
 	if (xmax > 320) /* width = xmax - xmin + 1 */
 	{
 		printf("pcx: bad xmax\n");
-		return false;
+		return NULL;
 	}
 
 	if (ymax > 256) /* height = ymax - ymin + 1 */
 	{
 		printf("pcx: bad ymax\n");
-		return false;
+		return NULL;
 	}
 
 /* grab the palette from the end of the file */
@@ -110,19 +111,19 @@ bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 	if (palette768[-1] != 0x0c)
 	{
 		printf("pcx: bad palette format\n");
-		return false;
+		return NULL;
 	}
 
-	outpixels = (unsigned char*)qmalloc((xmax + 1) * (ymax + 1) * 4);
-	if (!outpixels)
+	image = image_alloc(xmax + 1, ymax + 1);
+	if (!image)
 	{
 		printf("pcx: out of memory\n");
-		return false;
+		return NULL;
 	}
 
 	for (y = 0; y <= ymax; y++)
 	{
-		pix = outpixels + 4 * y * (xmax + 1);
+		pix = image->pixels + 4 * y * (xmax + 1);
 
 		for (x = 0; x <= xmax; )
 		{
@@ -148,8 +149,5 @@ bool_t image_pcx_load(void *filedata, size_t filesize, image_rgba_t *out_image)
 		}
 	}
 
-	out_image->pixels = outpixels;
-	out_image->width = xmax + 1;
-	out_image->height = ymax + 1;
-	return true;
+	return image;
 }
