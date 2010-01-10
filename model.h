@@ -94,9 +94,13 @@ typedef struct model_s
 
 void mesh_initialize(mesh_t *mesh);
 void mesh_free(mesh_t *mesh);
+void mesh_generaterenderdata(mesh_t *mesh);
+void mesh_freerenderdata(mesh_t *mesh);
 
 void model_initialize(model_t *model);
 void model_free(model_t *model);
+void model_generaterenderdata(model_t *model);
+void model_freerenderdata(model_t *model);
 
 /* note that the filedata pointer is not const, because it may be modified (most likely by byteswapping) */
 bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error);
@@ -108,8 +112,5 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size);
 
 mesh_t *model_merge_meshes(model_t *model);
-
-void model_generaterenderdata(model_t *model);
-void model_freerenderdata(model_t *model);
 
 #endif

@@ -36,14 +36,65 @@ void mesh_free(mesh_t *mesh)
 	image_free(&mesh->texture_diffuse);
 	image_free(&mesh->texture_fullbright);
 
-	if (mesh->renderdata.initialized)
-	{
-		qfree(mesh->renderdata.texcoord2f);
-		image_free(&mesh->renderdata.texture_diffuse);
-		image_free(&mesh->renderdata.texture_fullbright);
+	mesh_freerenderdata(mesh);
+}
 
-	/* FIXME - release the uploaded texture */
+void mesh_generaterenderdata(mesh_t *mesh)
+{
+	int w, h;
+	float fw, fh;
+	int i;
+
+	if (mesh->renderdata.initialized)
+		return;
+
+	if (mesh->texture_diffuse.pixels && mesh->texture_fullbright.pixels)
+	{
+	/* pad the texture up to a power of two */
+		for (w = 1; w < mesh->texture_diffuse.width; w <<= 1);
+		for (h = 1; h < mesh->texture_diffuse.height; h <<= 1);
+
+		image_pad(&mesh->renderdata.texture_diffuse, &mesh->texture_diffuse, w, h);
+		image_pad(&mesh->renderdata.texture_fullbright, &mesh->texture_fullbright, w, h);
+
+	/* generate padded texcoords */
+		mesh->renderdata.texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
+
+		fw = (float)mesh->texture_diffuse.width / (float)w;
+		fh = (float)mesh->texture_diffuse.height / (float)h;
+		for (i = 0; i < mesh->num_vertices; i++)
+		{
+			mesh->renderdata.texcoord2f[i*2+0] = mesh->texcoord2f[i*2+0] * fw;
+			mesh->renderdata.texcoord2f[i*2+1] = mesh->texcoord2f[i*2+1] * fh;
+		}
 	}
+	else
+	{
+		mesh->renderdata.texture_diffuse.width = 0;
+		mesh->renderdata.texture_diffuse.height = 0;
+		mesh->renderdata.texture_diffuse.pixels = NULL;
+
+		mesh->renderdata.texture_fullbright.width = 0;
+		mesh->renderdata.texture_fullbright.height = 0;
+		mesh->renderdata.texture_fullbright.pixels = NULL;
+	}
+
+	mesh->renderdata.texture_diffuse_handle = 0;
+	mesh->renderdata.texture_fullbright_handle = 0;
+
+	mesh->renderdata.initialized = true;
+}
+
+void mesh_freerenderdata(mesh_t *mesh)
+{
+	if (!mesh->renderdata.initialized)
+		return;
+
+	image_free(&mesh->renderdata.texture_diffuse);
+	image_free(&mesh->renderdata.texture_fullbright);
+	qfree(mesh->renderdata.texcoord2f);
+
+/* FIXME - release the uploaded texture */
 }
 
 void model_initialize(model_t *model)
@@ -105,60 +156,20 @@ bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t
 	return false;
 }
 
-/* FIXME - some models might have no texture loaded... */
 void model_generaterenderdata(model_t *model)
 {
-	int i, j;
-	mesh_t *mesh;
-	int w, h;
-	float fw, fh;
+	int i;
 
-	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
-	{
-		if (mesh->renderdata.initialized)
-			continue;
-
-	/* pad the texture up to a power of two */
-		for (w = 1; w < mesh->texture_diffuse.width; w <<= 1);
-		for (h = 1; h < mesh->texture_diffuse.height; h <<= 1);
-
-		image_pad(&mesh->renderdata.texture_diffuse, &mesh->texture_diffuse, w, h);
-		image_pad(&mesh->renderdata.texture_fullbright, &mesh->texture_fullbright, w, h);
-
-	/* generate padded texcoords */
-		mesh->renderdata.texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
-
-		fw = (float)mesh->texture_diffuse.width / (float)w;
-		fh = (float)mesh->texture_diffuse.height / (float)h;
-		for (j = 0; j < mesh->num_vertices; j++)
-		{
-			mesh->renderdata.texcoord2f[j*2+0] = mesh->texcoord2f[j*2+0] * fw;
-			mesh->renderdata.texcoord2f[j*2+1] = mesh->texcoord2f[j*2+1] * fh;
-		}
-
-		mesh->renderdata.texture_diffuse_handle = 0;
-		mesh->renderdata.texture_fullbright_handle = 0;
-
-		mesh->renderdata.initialized = true;
-	}
+	for (i = 0; i < model->num_meshes; i++)
+		mesh_generaterenderdata(&model->meshes[i]);
 }
 
 void model_freerenderdata(model_t *model)
 {
 	int i;
-	mesh_t *mesh;
 
-	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
-	{
-		if (!mesh->renderdata.initialized)
-			continue;
-
-		image_free(&mesh->renderdata.texture_diffuse);
-		image_free(&mesh->renderdata.texture_fullbright);
-		qfree(mesh->renderdata.texcoord2f);
-
-	/* FIXME - release the uploaded texture */
-	}
+	for (i = 0; i < model->num_meshes; i++)
+		mesh_freerenderdata(&model->meshes[i]);
 }
 
 /* merge all meshes into one */
