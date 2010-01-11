@@ -27,17 +27,17 @@ typedef struct pcx_header_s
 	char version;
 	char encoding;
 	char bits_per_pixel;
-	unsigned short xmin;
-	unsigned short ymin;
-	unsigned short xmax;
-	unsigned short ymax;
-	unsigned short hres;
-	unsigned short vres;
+	short xmin;
+	short ymin;
+	short xmax;
+	short ymax;
+	short hres;
+	short vres;
 	unsigned char palette[48];
 	char reserved;
 	char color_planes;
-	unsigned short bytes_per_line;
-	unsigned short palette_type;
+	short bytes_per_line;
+	short palette_type;
 	char filler[58];
 } pcx_header_t;
 
@@ -97,25 +97,13 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
 		return NULL;
 	}
 
-	if (header->xmin != 0)
-	{
-		printf("pcx: bad xmin\n");
-		return NULL;
-	}
-
-	if (header->ymin != 0)
-	{
-		printf("pcx: bad ymin\n");
-		return NULL;
-	}
-
-	if (header->xmax > 4095) /* width = xmax - xmin + 1 */
+	if (header->xmax - header->xmin + 1 < 1 || header->xmax - header->xmin + 1 > 4096)
 	{
 		printf("pcx: bad xmax\n");
 		return NULL;
 	}
 
-	if (header->ymax > 4095) /* height = ymax - ymin + 1 */
+	if (header->ymax - header->ymin + 1 < 1 || header->ymax - header->ymin + 1 > 4096)
 	{
 		printf("pcx: bad ymax\n");
 		return NULL;
@@ -137,16 +125,16 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
 		return NULL;
 	}
 
-	image = image_alloc(header->xmax + 1, header->ymax + 1);
+	image = image_alloc(header->xmax - header->xmin + 1, header->ymax - header->ymin + 1);
 	if (!image)
 	{
 		printf("pcx: out of memory\n");
 		return NULL;
 	}
 
-	for (y = 0; y < header->ymax + 1; y++)
+	for (y = 0; y < header->ymax - header->ymin + 1; y++)
 	{
-		pix = image->pixels + 4 * y * (header->xmax + 1);
+		pix = image->pixels + y * image->width * 4;
 
 		for (x = 0; x < header->bytes_per_line; )
 		{
