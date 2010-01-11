@@ -204,11 +204,11 @@ size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t file
 
 		for (x = 0; x < header->bytes_per_line; )
 		{
-			unsigned char pix_x = (x < image->width) ? pix[x] : 0;
+			unsigned char pix_x = (x < image->width) ? pix[x] : pix[image->width - 1];
 			int runlen;
 
 			for (runlen = 1; runlen < 63 && x + runlen < header->bytes_per_line; runlen++)
-				if (pix_x != (((x + runlen) < image->width) ? pix[x + runlen] : 0))
+				if (pix_x != (((x + runlen) < image->width) ? pix[x + runlen] : pix[image->width - 1]))
 					break;
 
 			if (runlen == 1)

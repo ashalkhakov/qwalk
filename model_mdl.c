@@ -111,13 +111,6 @@ typedef struct daliasinterval_s
 	float interval;
 } daliasinterval_t;
 
-typedef struct mdl_meshvert_s
-{
-	int vertex; /* index to mdl_trivertx_t (in mdl_simpleframe_t) */
-	int s, t, back;
-} mdl_meshvert_t;
-
-/* Quake palette included for convenience - John Carmack considers it to be in the public domain. */
 static palette_t quakepalette = 
 {
 	{
@@ -230,6 +223,12 @@ static int mdl_counttotalframes(const unsigned char *f, int numframes, int numve
 
 bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
+	typedef struct mdl_meshvert_s
+	{
+		int vertex;
+		int s, t, back;
+	} mdl_meshvert_t;
+
 	unsigned char *f = (unsigned char*)filedata;
 	mdl_header_t *header;
 	int i, j, k, offset;
@@ -405,6 +404,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		for (j = 0; j < 3; j++)
 		{
 			int vertnum;
+			mdl_meshvert_t *mv;
 
 			int xyz = itriangles[i].vertices[j];
 
@@ -413,20 +413,16 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			int back = stverts[xyz].onseam && !itriangles[i].facesfront;
 
 		/* add the vertex if it doesn't exist, otherwise use the old one */
-			for (vertnum = 0; vertnum < mesh->num_vertices; vertnum++)
-			{
-				mdl_meshvert_t *mv = &meshverts[vertnum];
-
+			for (vertnum = 0, mv = meshverts; vertnum < mesh->num_vertices; vertnum++, mv++)
 				if (mv->vertex == xyz && mv->s == s && mv->t == t && mv->back == back)
 					break;
-			}
 			if (vertnum == mesh->num_vertices)
 			{
-				meshverts[vertnum].vertex = xyz;
-				meshverts[vertnum].s = s;
-				meshverts[vertnum].t = t;
-				meshverts[vertnum].back = back;
-				mesh->num_vertices++;
+				mv = &meshverts[mesh->num_vertices++];
+				mv->vertex = xyz;
+				mv->s = s;
+				mv->t = t;
+				mv->back = back;
 			}
 
 			mesh->triangle3i[i * 3 + j] = vertnum; /* (clockwise winding) */
