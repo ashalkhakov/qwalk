@@ -202,32 +202,29 @@ size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t file
 	{
 		const unsigned char *pix = image->pixels + y * image->width;
 
-		for (x = 0; x < image->width; )
+		for (x = 0; x < header->bytes_per_line; )
 		{
+			unsigned char pix_x = (x < image->width) ? pix[x] : 0;
 			int runlen;
 
-			for (runlen = 1; runlen < 63 && x + runlen < image->width; runlen++)
-				if (pix[x] != pix[x + runlen])
+			for (runlen = 1; runlen < 63 && x + runlen < header->bytes_per_line; runlen++)
+				if (pix_x != (((x + runlen) < image->width) ? pix[x + runlen] : 0))
 					break;
 
 			if (runlen == 1)
 			{
-				if ((pix[x] & 0xc0) == 0xc0)
+				if ((pix_x & 0xc0) == 0xc0)
 					*f++ = 0xc1;
-				*f++ = pix[x];
+				*f++ = pix_x;
 			}
 			else
 			{
 				*f++ = 0xc0 | runlen;
-				*f++ = pix[x];
+				*f++ = pix_x;
 			}
 
 			x += runlen;
 		}
-
-	/* i have no idea if this is correct */
-		for (; x < header->bytes_per_line; x++)
-			*f++ = 0;
 	}
 
 /* write palette */
