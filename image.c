@@ -128,7 +128,7 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 	pimage->width = source_diffuse->width;
 	pimage->height = source_diffuse->height;
 	pimage->pixels = (unsigned char*)qmalloc(pimage->width * pimage->height);
-	/*pimage->palette = *palette;*/
+	pimage->palette = *palette;
 
 	if (source_diffuse && source_diffuse->pixels && source_fullbright && source_fullbright->pixels)
 	{

@@ -34,7 +34,7 @@ typedef struct image_rgba_s
 /* 8-bit (256 colour) paletted image */
 typedef struct image_paletted_s
 {
-	/*palette_t palette;*/
+	palette_t palette;
 
 	int width, height;
 	unsigned char *pixels;
@@ -51,6 +51,8 @@ image_rgba_t *image_clone(const image_rgba_t *source);
 image_rgba_t *image_pcx_load(void *filedata, size_t filesize);
 image_rgba_t *image_tga_load(void *filedata, size_t filesize);
 image_rgba_t *image_jpeg_load(void *filedata, size_t filesize);
+
+size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t filesize);
 
 image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
 image_rgba_t *image_pad(const image_rgba_t *source, int width, int height);

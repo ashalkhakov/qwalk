@@ -322,10 +322,13 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 {
+	const char *skinfilename = "skin.pcx"; /* FIXME */
+	char *error;
 	unsigned char *data;
+	size_t imagesize;
 	const mesh_t *mesh;
 	md2_header_t *header;
-/*	image_paletted_t *pimage;*/
+	image_paletted_t *pimage;
 	int offset;
 	int i, j, k;
 	md2_skin_t *md2skin;
@@ -341,20 +344,35 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 
 	mesh = &model->meshes[0];
 
-/* create 8-bit texture */
-/*	pimage = image_palettize(&quake2palette, mesh->skins[SKIN_DIFFUSE], mesh->skins[SKIN_FULLBRIGHT]);*/
-
-/* allocate data */
+/* allocate memory for writing */
 	data = qmalloc(16*1024*1024); /* FIXME */
-	offset = 0;
+
+/* create 8-bit texture */
+	pimage = image_palettize(&quake2palette, mesh->skins[SKIN_DIFFUSE], mesh->skins[SKIN_FULLBRIGHT]);
+
+	imagesize = image_pcx_save(pimage, data, 16*1024*1024);
+	if (!imagesize)
+	{
+		printf("model_md2_save: failed to create pcx\n");
+		return false;
+	}
+
+	if (!writefile(skinfilename, data, imagesize, &error))
+	{
+		printf("model_md2_save: failed to write %s: %s\n", skinfilename, error);
+		qfree(error);
+		return false;
+	}
 
 /* write header */
+	offset = 0;
+
 	header = (md2_header_t*)(data + offset);
 
 	memcpy(header->ident, "IDP2", 4);
 	header->version = 8;
-	header->skinwidth = mesh->skins[SKIN_DIFFUSE]->width;//pimage->width;
-	header->skinheight = mesh->skins[SKIN_DIFFUSE]->height;//pimage->height;
+	header->skinwidth = pimage->width;
+	header->skinheight = pimage->height;
 	header->framesize = sizeof(md2_frame_t) + sizeof(md2_vertex_t) * (mesh->num_vertices - 1); /* subtract one because md2_frame_t has an array of one */
 	header->num_skins = 1;
 	header->num_vertices = mesh->num_vertices;
@@ -375,7 +393,7 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offset_skins = offset;
 
 	md2skin = (md2_skin_t*)(data + offset);
-	strlcpy(md2skin->name, "", sizeof(md2skin->name)); /* FIXME */
+	strlcpy(md2skin->name, skinfilename, sizeof(md2skin->name));
 
 	offset += sizeof(md2_skin_t);
 
