@@ -21,14 +21,14 @@
 #include "global.h"
 #include "model.h"
 
-void mesh_initialize(mesh_t *mesh)
+void mesh_initialize(model_t *model, mesh_t *mesh)
 {
 	memset(mesh, 0, sizeof(mesh_t));
 }
 
-void mesh_free(mesh_t *mesh)
+void mesh_free(model_t *model, mesh_t *mesh)
 {
-	int i;
+	int i, j;
 
 	qfree(mesh->name);
 	qfree(mesh->vertex3f);
@@ -36,69 +36,83 @@ void mesh_free(mesh_t *mesh)
 	qfree(mesh->texcoord2f);
 	qfree(mesh->triangle3i);
 
-	for (i = 0; i < SKIN_NUMTYPES; i++)
-		image_free(&mesh->skins[i]);
+	for (i = 0; i < model->total_skins; i++)
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+			image_free(&mesh->textures[i].components[j]);
+	qfree(mesh->textures);
 
-	mesh_freerenderdata(mesh);
+	mesh_freerenderdata(model, mesh);
 }
 
-void mesh_generaterenderdata(mesh_t *mesh)
+void mesh_generaterenderdata(model_t *model, mesh_t *mesh)
 {
-	int i, j;
+	int i, j, k;
 	int w, h;
 	float fw, fh;
 
 	if (mesh->renderdata.initialized)
 		return;
 
-	for (i = 0; i < SKIN_NUMTYPES; i++)
+	mesh->renderdata.textures = (struct renderdata_texture*)qmalloc(sizeof(struct renderdata_texture) * model->total_skins);
+
+	for (i = 0; i < model->total_skins; i++)
 	{
-		if (mesh->skins[i])
+		for (j = 0; j < SKIN_NUMTYPES; j++)
 		{
-		/* pad the skin up to a power of two */
-			for (w = 1; w < mesh->skins[i]->width; w <<= 1);
-			for (h = 1; h < mesh->skins[i]->height; h <<= 1);
+			const image_rgba_t *component = mesh->textures[i].components[j];
 
-		/* generate padded texcoords */
-			mesh->renderdata.skins[i].texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
-
-			fw = (float)mesh->skins[i]->width / (float)w;
-			fh = (float)mesh->skins[i]->height / (float)h;
-			for (j = 0; j < mesh->num_vertices; j++)
+			if (component)
 			{
-				mesh->renderdata.skins[i].texcoord2f[j*2+0] = mesh->texcoord2f[j*2+0] * fw;
-				mesh->renderdata.skins[i].texcoord2f[j*2+1] = mesh->texcoord2f[j*2+1] * fh;
+			/* pad the skin up to a power of two */
+				for (w = 1; w < component->width; w <<= 1);
+				for (h = 1; h < component->height; h <<= 1);
+
+			/* generate padded texcoords */
+				mesh->renderdata.textures[i].components[j].texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_vertices);
+
+				fw = (float)component->width / (float)w;
+				fh = (float)component->height / (float)h;
+				for (k = 0; k < mesh->num_vertices; k++)
+				{
+					mesh->renderdata.textures[i].components[j].texcoord2f[k*2+0] = mesh->texcoord2f[k*2+0] * fw;
+					mesh->renderdata.textures[i].components[j].texcoord2f[k*2+1] = mesh->texcoord2f[k*2+1] * fh;
+				}
+
+			/* pad the skin image */
+				mesh->renderdata.textures[i].components[j].image = image_pad(component, w, h);
+			}
+			else
+			{
+				mesh->renderdata.textures[i].components[j].texcoord2f = NULL;
+				mesh->renderdata.textures[i].components[j].image = NULL;
 			}
 
-		/* pad the skin image */
-			mesh->renderdata.skins[i].image = image_pad(mesh->skins[i], w, h);
+			mesh->renderdata.textures[i].components[j].handle = 0;
 		}
-		else
-		{
-			mesh->renderdata.skins[i].texcoord2f = NULL;
-			mesh->renderdata.skins[i].image = NULL;
-		}
-
-		mesh->renderdata.skins[i].handle = 0;
 	}
 
 	mesh->renderdata.initialized = true;
 }
 
-void mesh_freerenderdata(mesh_t *mesh)
+void mesh_freerenderdata(model_t *model, mesh_t *mesh)
 {
-	int i;
+	int i, j;
 
 	if (!mesh->renderdata.initialized)
 		return;
 
-	for (i = 0; i < SKIN_NUMTYPES; i++)
+	for (i = 0; i < model->total_skins; i++)
 	{
-		qfree(mesh->renderdata.skins[i].texcoord2f);
-		image_free(&mesh->renderdata.skins[i].image);
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+		{
+			qfree(mesh->renderdata.textures[i].components[j].texcoord2f);
+			image_free(&mesh->renderdata.textures[i].components[j].image);
 
-	/* FIXME - release the uploaded texture */
+		/* FIXME - release the uploaded texture */
+		}
 	}
+
+	qfree(mesh->renderdata.textures);
 }
 
 void model_initialize(model_t *model)
@@ -109,10 +123,20 @@ void model_initialize(model_t *model)
 void model_free(model_t *model)
 {
 	int i, j;
+	skininfo_t *skininfo;
+	singleskin_t *singleskin;
 	frameinfo_t *frameinfo;
 	singleframe_t *singleframe;
 	tag_t *tag;
 	mesh_t *mesh;
+
+	for (i = 0, skininfo = model->skininfo; i < model->num_skins; i++, skininfo++)
+	{
+		for (j = 0, singleskin = skininfo->skins; j < skininfo->num_skins; j++, singleskin++)
+			qfree(singleskin->name);
+		qfree(skininfo->skins);
+	}
+	qfree(model->skininfo);
 
 	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
 	{
@@ -130,7 +154,7 @@ void model_free(model_t *model)
 	qfree(model->tags);
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
-		mesh_free(mesh);
+		mesh_free(model, mesh);
 	qfree(model->meshes);
 
 	qfree(model);
@@ -165,7 +189,7 @@ void model_generaterenderdata(model_t *model)
 	int i;
 
 	for (i = 0; i < model->num_meshes; i++)
-		mesh_generaterenderdata(&model->meshes[i]);
+		mesh_generaterenderdata(model, &model->meshes[i]);
 }
 
 void model_freerenderdata(model_t *model)
@@ -173,7 +197,7 @@ void model_freerenderdata(model_t *model)
 	int i;
 
 	for (i = 0; i < model->num_meshes; i++)
-		mesh_freerenderdata(&model->meshes[i]);
+		mesh_freerenderdata(model, &model->meshes[i]);
 }
 
 /* merge all meshes into one */
@@ -190,7 +214,7 @@ mesh_t *model_merge_meshes(model_t *model)
 		return &model->meshes[0];
 
 	newmesh = (mesh_t*)qmalloc(sizeof(mesh_t));
-	mesh_initialize(newmesh);
+	mesh_initialize(model, newmesh);
 
 	newmesh->name = copystring("merged");
 
@@ -245,12 +269,22 @@ mesh_t *model_merge_meshes(model_t *model)
 		ofs_tris += mesh->num_triangles;
 	}
 
-	for (i = 0; i < SKIN_NUMTYPES; i++)
-		if (model->meshes[0].skins[i])
-			newmesh->skins[i] = image_clone(model->meshes[0].skins[i]);
+/* FIXME - this just grabs the first mesh's skin */
+	newmesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model->total_skins);
+
+	for (i = 0; i < model->total_skins; i++)
+	{
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+		{
+			if (model->meshes[0].textures[i].components[j])
+				newmesh->textures[i].components[j] = image_clone(model->meshes[0].textures[i].components[j]);
+			else
+				newmesh->textures[i].components[j] = NULL;
+		}
+	}
 
 	for (i = 0; i < model->num_meshes; i++)
-		mesh_free(&model->meshes[i]);
+		mesh_free(model, &model->meshes[i]);
 	qfree(model->meshes);
 
 	model->num_meshes = 1;

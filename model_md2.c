@@ -183,8 +183,10 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	unsigned char *f = (unsigned char*)filedata;
 	md2_header_t *header;
 	int i, j;
-	md2_texcoord_t *texcoords;
-	md2_triangle_t *triangles;
+	const md2_skin_t *md2skins;
+	const md2_frame_t *md2frames;
+	const md2_texcoord_t *md2texcoords;
+	const md2_triangle_t *md2triangles;
 	model_t model;
 	mesh_t *mesh;
 	md2_meshvert_t *meshverts;
@@ -206,27 +208,39 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		return false;
 	}
 
-/* byteswap header */
+/* byteswap file */
 	swap_md2(filedata, filesize);
 
 /* stuff */
-	texcoords = (md2_texcoord_t*)(f + header->offset_st);
-	triangles = (md2_triangle_t*)(f + header->offset_tris);
+	md2skins = (md2_skin_t*)(f + header->offset_skins);
+	md2frames = (md2_frame_t*)(f + header->offset_frames);
+	md2texcoords = (md2_texcoord_t*)(f + header->offset_st);
+	md2triangles = (md2_triangle_t*)(f + header->offset_tris);
 
 /* stuff */
-	model.total_frames = header->num_frames;
+	model.total_skins = header->num_skins;
+	model.num_skins = header->num_skins;
+	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
 
+	for (i = 0; i < model.num_skins; i++)
+	{
+		model.skininfo[i].frametime = 0.1f;
+		model.skininfo[i].num_skins = 1;
+		model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+		model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
+		model.skininfo[i].skins[0].offset = i;
+	}
+
+	model.total_frames = header->num_frames;
 	model.num_frames = header->num_frames;
 	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
 
 	for (i = 0; i < model.num_frames; i++)
 	{
-		md2_frame_t *frame = (md2_frame_t*)(f + header->offset_frames + i * header->framesize);
-
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
 		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = copystring(frame->name);
+		model.frameinfo[i].frames[0].name = copystring(md2frames[i].name);
 		model.frameinfo[i].frames[0].offset = i;
 	}
 
@@ -240,9 +254,43 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	model.synctype = 0;
 
 	mesh = &model.meshes[0];
-	mesh_initialize(mesh);
+	mesh_initialize(&model, mesh);
 
 	mesh->name = copystring("md2mesh");
+
+	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.num_skins);
+	for (i = 0; i < model.num_skins; i++)
+	{
+		void *filedata;
+		size_t filesize;
+		char *error;
+		image_rgba_t *image;
+
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+			mesh->textures[i].components[j] = NULL;
+
+	/* try to load the image file mentioned in the md2 */
+	/* if any of the skins fail to load, they will be left as null */
+		if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
+		{
+			printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
+			qfree(error);
+			continue;
+		}
+
+		image = image_load(md2skins[i].name, filedata, filesize);
+		if (!image)
+		{
+			printf("md2: failed to load image \"%s\"\n", md2skins[i].name);
+			qfree(error);
+			qfree(filedata);
+			continue;
+		}
+
+		qfree(filedata);
+
+		mesh->textures[i].components[SKIN_DIFFUSE] = image;
+	}
 
 	mesh->num_triangles = header->num_tris;
 	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
@@ -254,8 +302,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		for (j = 0; j < 3; j++)
 		{
 			int vertnum;
-			unsigned short xyz = triangles[i].vertex[j];
-			unsigned short st = triangles[i].st[j];
+			unsigned short xyz = md2triangles[i].vertex[j];
+			unsigned short st = md2triangles[i].st[j];
 
 			for (vertnum = 0; vertnum < mesh->num_vertices; vertnum++)
 			{
@@ -282,8 +330,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	iheight = 1.0f / header->skinheight;
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		mesh->texcoord2f[i*2+0] = (texcoords[meshverts[i].texcoord].s + 0.5f) * iwidth;
-		mesh->texcoord2f[i*2+1] = (texcoords[meshverts[i].texcoord].t + 0.5f) * iheight;
+		mesh->texcoord2f[i*2+0] = (md2texcoords[meshverts[i].texcoord].s + 0.5f) * iwidth;
+		mesh->texcoord2f[i*2+1] = (md2texcoords[meshverts[i].texcoord].t + 0.5f) * iheight;
 	}
 
 	mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
@@ -314,24 +362,30 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	qfree(meshverts);
 
-/* FIXME - load skin? */
-
 	*out_model = model;
 	return true;
 }
 
+static char *md2_create_skin_filename(const char *skinname)
+{
+	const char *ext = strrchr(skinname, '.');
+
+	if (ext && !strcmp(ext, ".pcx"))
+		return copystring(skinname);
+	else
+		return msprintf("%s.pcx", skinname);
+}
+
 bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 {
-	const char *skinfilename = "skin.pcx"; /* FIXME */
 	char *error;
 	unsigned char *data;
-	size_t imagesize;
+	int skinwidth, skinheight;
+	char **skinfilenames;
 	const mesh_t *mesh;
 	md2_header_t *header;
-	image_paletted_t *pimage;
 	int offset;
 	int i, j, k;
-	md2_skin_t *md2skin;
 
 	if (model->num_meshes != 1)
 	{
@@ -340,28 +394,48 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 		return false;
 	}
 
-	/* FIXME - resample fullbright skin to match diffuse skin size */
+	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
 
 	mesh = &model->meshes[0];
 
 /* allocate memory for writing */
 	data = qmalloc(16*1024*1024); /* FIXME */
 
-/* create 8-bit texture */
-	pimage = image_palettize(&quake2palette, mesh->skins[SKIN_DIFFUSE], mesh->skins[SKIN_FULLBRIGHT]);
+/* create 8-bit textures */
+	skinwidth = 0;
+	skinheight = 0;
+	skinfilenames = (char**)qmalloc(sizeof(char*) * model->num_skins);
 
-	imagesize = image_pcx_save(pimage, data, 16*1024*1024);
-	if (!imagesize)
+	for (i = 0; i < model->num_skins; i++)
 	{
-		printf("model_md2_save: failed to create pcx\n");
-		return false;
-	}
+		image_paletted_t *pimage;
+		size_t imagesize;
 
-	if (!writefile(skinfilename, data, imagesize, &error))
-	{
-		printf("model_md2_save: failed to write %s: %s\n", skinfilename, error);
-		qfree(error);
-		return false;
+		offset = model->skininfo[i].skins[0].offset; /* skingroups not supported */
+
+		pimage = image_palettize(&quake2palette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+
+		imagesize = image_pcx_save(pimage, data, 16*1024*1024);
+		if (!imagesize)
+		{
+			printf("model_md2_save: failed to create pcx\n");
+			/* FIXME - free stuff */
+			return false;
+		}
+
+		skinfilenames[i] = md2_create_skin_filename(model->skininfo[i].skins[0].name);
+
+		if (!writefile(skinfilenames[i], data, imagesize, &error))
+		{
+			printf("model_md2_save: failed to write %s: %s\n", skinfilenames[i], error);
+			/* FIXME - free stuff */
+			qfree(error);
+			return false;
+		}
+
+		skinwidth = pimage->width;
+		skinheight = pimage->height;
+		qfree(pimage);
 	}
 
 /* write header */
@@ -371,10 +445,10 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 
 	memcpy(header->ident, "IDP2", 4);
 	header->version = 8;
-	header->skinwidth = pimage->width;
-	header->skinheight = pimage->height;
+	header->skinwidth = skinwidth;
+	header->skinheight = skinheight;
 	header->framesize = sizeof(md2_frame_t) + sizeof(md2_vertex_t) * (mesh->num_vertices - 1); /* subtract one because md2_frame_t has an array of one */
-	header->num_skins = 1;
+	header->num_skins = model->num_skins;
 	header->num_vertices = mesh->num_vertices;
 	header->num_st = mesh->num_vertices;
 	header->num_tris = mesh->num_triangles;
@@ -392,10 +466,13 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 /* write skins */
 	header->offset_skins = offset;
 
-	md2skin = (md2_skin_t*)(data + offset);
-	strlcpy(md2skin->name, skinfilename, sizeof(md2skin->name));
+	for (i = 0; i < model->num_skins; i++)
+	{
+		md2_skin_t *md2skin = (md2_skin_t*)(data + offset);
+		strlcpy(md2skin->name, skinfilenames[i], sizeof(md2skin->name));
 
-	offset += sizeof(md2_skin_t);
+		offset += sizeof(md2_skin_t);
+	}
 
 /* write texcoords */
 	header->offset_st = offset;
@@ -483,6 +560,10 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offset_end = offset;
 
 /* done */
+	for (i = 0; i < model->num_skins; i++)
+		qfree(skinfilenames[i]);
+	qfree(skinfilenames);
+
 	swap_md2(data, offset);
 	*out_data = data;
 	*out_size = offset;

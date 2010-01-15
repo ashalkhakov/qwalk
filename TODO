@@ -17,7 +17,6 @@
 - Allow configuration of the fullbright rules when downsampling to the palette
   when exporting MDLs. Possibly just import the colormap, and tell it to ignore
   fullbrights.
-- Implement skingroups.
 - Write an MD2 writer.
 - Generate MD2 glcmds.
 - Write an MD3 writer.

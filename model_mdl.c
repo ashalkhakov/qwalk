@@ -29,13 +29,14 @@ int compress_normal(const float *normal);
 #define ALIAS_ONSEAM 0x0020
 
 /* mdl_itriangle_t::facesfront */
-/*#define */
+/*#define DT_FACES_FRONT 0x0010*/
 
 /* mdl_header_t::synctype */
 #define ST_SYNC 0
 #define ST_RAND 1
 
 typedef enum aliasframetype_e { ALIAS_SINGLE = 0, ALIAS_GROUP } aliasframetype_t;
+typedef enum aliasskintype_e { ALIAS_SKIN_SINGLE = 0, ALIAS_SKIN_GROUP } aliasskintype_t;
 
 typedef struct mdl_header_s
 {
@@ -59,57 +60,63 @@ typedef struct mdl_header_s
 	float size; /* average size of triangles */
 } mdl_header_t;
 
-typedef struct mdl_skin_s
-{
-	int group; /* group = 0 */
-	unsigned char *skin;
-} mdl_skin_t;
-
-typedef struct mdl_skingroup_s
-{
-	int group; /* group = 1 */
-	int nb;
-	float *time;
-	unsigned char *skin;
-} mdl_skingroup_t;
-
-typedef struct mdl_stvert_s
+typedef struct stvert_s
 {
 	int onseam;
 	int s;
 	int t;
-} mdl_stvert_t;
+} stvert_t;
 
-typedef struct mdl_itriangle_s
+typedef struct dtriangle_s
 {
 	int facesfront;
-	int vertices[3];
-} mdl_itriangle_t;
+	int vertindex[3];
+} dtriangle_t;
 
-typedef struct mdl_trivertx_s
+typedef struct trivertx_s
 {
-	unsigned char packedposition[3];
+	unsigned char v[3];
 	unsigned char lightnormalindex;
-} mdl_trivertx_t;
+} trivertx_t;
+
+typedef struct daliasframetype_s
+{
+	aliasframetype_t type;
+} daliasframetype_t;
 
 typedef struct daliasframe_s
 {
-	mdl_trivertx_t bboxmin; /* lightnormal isn't used */
-	mdl_trivertx_t bboxmax; /* lightnormal isn't used */
+	trivertx_t bboxmin; /* lightnormal isn't used */
+	trivertx_t bboxmax; /* lightnormal isn't used */
 	char name[16];
 } daliasframe_t;
 
 typedef struct daliasgroup_s
 {
 	int numframes;
-	mdl_trivertx_t bboxmin; /* lightnormal isn't used */
-	mdl_trivertx_t bboxmax; /* lightnormal isn't used */
+	trivertx_t bboxmin; /* lightnormal isn't used */
+	trivertx_t bboxmax; /* lightnormal isn't used */
 } daliasgroup_t;
 
 typedef struct daliasinterval_s
 {
 	float interval;
 } daliasinterval_t;
+
+typedef struct daliasskintype_s
+{
+	aliasskintype_t type;
+} daliasskintype_t;
+
+typedef struct daliasskingroup_s
+{
+	int numskins;
+} daliasskingroup_t;
+
+typedef struct daliasskininterval_s
+{
+	float interval;
+} daliasskininterval_t;
 
 static palette_t quakepalette = 
 {
@@ -134,11 +141,19 @@ static palette_t quakepalette =
 	{ 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xFFFFFFFF }
 };
 
+static int g_mdl_totalskins;
+static int g_mdl_totalframes;
+
 static void swap_mdl(void *filedata, size_t filesize)
 {
 	unsigned char *f = (unsigned char*)filedata;
 	mdl_header_t *header;
-	int i;
+	stvert_t *stverts;
+	dtriangle_t *dtriangles;
+	int i, j;
+
+	g_mdl_totalskins = 0;
+	g_mdl_totalframes = 0;
 
 	header = (mdl_header_t*)f;
 
@@ -168,57 +183,95 @@ static void swap_mdl(void *filedata, size_t filesize)
 /* swap skins */
 	for (i = 0; i < header->numskins; i++)
 	{
-	/*	int *group = (int*)f;
+		daliasskintype_t *skintype;
 
-		f += sizeof(int);
+		skintype = (daliasskintype_t*)f;
+		skintype->type = LittleLong(skintype->type);
+		f += sizeof(daliasskintype_t);
 
-		*group = LittleLong(*group);
-
-		switch (*group)
+		if (skintype->type == ALIAS_SKIN_SINGLE)
 		{
-		case 0:
 			f += header->skinwidth * header->skinheight;
-			break;
-		case 1:  FIXME - TODO  break;
-		}*/
-	}
-}
 
-static int mdl_counttotalframes(const unsigned char *f, int numframes, int numvertices)
-{
-	int i, j;
-	int total_frames = 0;
-
-	for (i = 0; i < numframes; i++)
-	{
-		int type = LittleLong(*(int*)f);
-		int count;
-
-		f += sizeof(int);
-
-		if (type == ALIAS_SINGLE)
-		{
-			count = 1;
+			g_mdl_totalskins++;
 		}
 		else
 		{
-			daliasgroup_t *group = (daliasgroup_t*)f;
-			f += sizeof(daliasgroup_t);
-			count = LittleLong(group->numframes);
+			daliasskingroup_t *group;
+			daliasskininterval_t *intervals;
 
-			f += count * sizeof(daliasinterval_t);
+			group = (daliasskingroup_t*)f;
+			group->numskins = LittleLong(group->numskins);
+			f += sizeof(daliasskingroup_t);
+
+			intervals = (daliasskininterval_t*)f;
+			for (j = 0; j < group->numskins; j++)
+				intervals[j].interval = LittleFloat(intervals[j].interval);
+			f += sizeof(daliasskininterval_t) * group->numskins;
+
+			f += group->numskins * header->skinwidth * header->skinheight;
+
+			g_mdl_totalskins += group->numskins;
 		}
-
-		for (j = 0; j < count; j++)
-		{
-			f += sizeof(daliasframe_t);
-			f += sizeof(mdl_trivertx_t) * numvertices;
-		}
-
-		total_frames += count;
 	}
 
-	return total_frames;
+/* swap texcoords */
+	stverts = (stvert_t*)f;
+	f += sizeof(stvert_t) * header->numverts;
+
+	for (i = 0; i < header->numverts; i++)
+	{
+		stverts[i].onseam = LittleLong(stverts[i].onseam);
+		stverts[i].s = LittleLong(stverts[i].s);
+		stverts[i].t = LittleLong(stverts[i].t);
+	}
+
+/* swap triangles */
+	dtriangles = (dtriangle_t*)f;
+	f += sizeof(dtriangle_t) * header->numtris;
+
+	for (i = 0; i < header->numtris; i++)
+	{
+		dtriangles[i].facesfront = LittleLong(dtriangles[i].facesfront);
+		dtriangles[i].vertindex[0] = LittleLong(dtriangles[i].vertindex[0]);
+		dtriangles[i].vertindex[1] = LittleLong(dtriangles[i].vertindex[1]);
+		dtriangles[i].vertindex[2] = LittleLong(dtriangles[i].vertindex[2]);
+	}
+
+/* swap frames */
+	for (i = 0; i < header->numframes; i++)
+	{
+		daliasframetype_t *frametype;
+
+		frametype = (daliasframetype_t*)f;
+		frametype->type = LittleLong(frametype->type);
+		f += sizeof(daliasframetype_t);
+
+		if (frametype->type == ALIAS_SINGLE)
+		{
+			f += sizeof(daliasframe_t) + sizeof(trivertx_t) * header->numverts;
+
+			g_mdl_totalframes++;
+		}
+		else
+		{
+			daliasgroup_t *group;
+			daliasinterval_t *intervals;
+
+			group = (daliasgroup_t*)f;
+			group->numframes = LittleLong(group->numframes);
+			f += sizeof(daliasgroup_t);
+
+			intervals = (daliasinterval_t*)f;
+			for (j = 0; j < group->numframes; j++)
+				intervals[j].interval = LittleFloat(intervals[j].interval);
+			f += sizeof(daliasinterval_t) * group->numframes;
+
+			f += (sizeof(daliasframe_t) + sizeof(trivertx_t) * header->numverts) * group->numframes;
+
+			g_mdl_totalframes += group->numframes;
+		}
+	}
 }
 
 bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
@@ -232,10 +285,10 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	unsigned char *f = (unsigned char*)filedata;
 	mdl_header_t *header;
 	int i, j, k, offset;
-	mdl_skin_t *skins;
-	mdl_stvert_t *stverts;
-	mdl_itriangle_t *itriangles;
-	mdl_trivertx_t **framevertstart;
+	stvert_t *stverts;
+	dtriangle_t *dtriangles;
+	trivertx_t **framevertstart;
+	unsigned char **skintexstart;
 	model_t model;
 	mesh_t *mesh;
 	mdl_meshvert_t *meshverts;
@@ -263,80 +316,89 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	f += sizeof(mdl_header_t);
 
 /* read skins */
-	skins = (mdl_skin_t*)qmalloc(sizeof(mdl_skin_t) * header->numskins);
+	model.num_skins = header->numskins;
+	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+
+	model.total_skins = g_mdl_totalskins; /* set by swap_mdl */
+
+	offset = 0;
+
+	skintexstart = (unsigned char**)qmalloc(sizeof(unsigned char*) * model.total_skins);
 	for (i = 0; i < header->numskins; i++)
 	{
-		int group = LittleLong(*(int*)f);
+		daliasskintype_t *skintype = (daliasskintype_t*)f;
+		f += sizeof(daliasskintype_t);
 
-		f += sizeof(int);
-
-		if (group == 0)
+		if (skintype->type == ALIAS_SKIN_SINGLE)
 		{
 		/* ordinary skin */
-			skins[i].group = 0;
-			skins[i].skin = (unsigned char*)f;
+			model.skininfo[i].frametime = 0.1f;
 
-			f += header->skinwidth * header->skinheight;
-		}
-		else if (group == 1)
-		{
-		/* skingroup */
-			if (out_error)
-				*out_error = msprintf("skingroups not supported");
-			qfree(skins);
-			return false;
+			model.skininfo[i].num_skins = 1;
+			model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(singleskin_t));
+
+			model.skininfo[i].skins[0].name = msprintf("skin%d", offset);
+			model.skininfo[i].skins[0].offset = offset;
 		}
 		else
 		{
-			if (out_error)
-				*out_error = msprintf("bad skin type");
-			qfree(skins);
-			return false;
+		/* skin group */
+			daliasskingroup_t *group;
+			daliasskininterval_t *intervals;
+
+			group = (daliasskingroup_t*)f;
+			f += sizeof(daliasskingroup_t);
+
+			intervals = (daliasskininterval_t*)f;
+			f += group->numskins * sizeof(daliasskininterval_t);
+
+		/* load into model */
+			model.skininfo[i].frametime = max(0.01f, intervals[0].interval);
+
+			model.skininfo[i].num_skins = group->numskins;
+			model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(singleskin_t) * group->numskins);
+
+			for (j = 0; j < group->numskins; j++)
+			{
+				model.skininfo[i].skins[j].name = msprintf("skin%d", offset);
+				model.skininfo[i].skins[j].offset = offset + j;
+			}
 		}
+
+		for (j = 0; j < model.skininfo[i].num_skins; j++)
+		{
+			skintexstart[offset + j] = f;
+			f += header->skinwidth * header->skinheight;
+		}
+
+		offset += model.skininfo[i].num_skins;
 	}
 
 /* read texcoords */
-	stverts = (mdl_stvert_t*)f;
-	f += sizeof(mdl_stvert_t) * header->numverts;
-
-	for (i = 0; i < header->numverts; i++)
-	{
-		stverts[i].onseam = LittleLong(stverts[i].onseam);
-		stverts[i].s = LittleLong(stverts[i].s);
-		stverts[i].t = LittleLong(stverts[i].t);
-	}
+	stverts = (stvert_t*)f;
+	f += sizeof(stvert_t) * header->numverts;
 
 /* read triangles */
-	itriangles = (mdl_itriangle_t*)f;
-	f += sizeof(mdl_itriangle_t) * header->numtris;
+	dtriangles = (dtriangle_t*)f;
+	f += sizeof(dtriangle_t) * header->numtris;
 
-	for (i = 0; i < header->numtris; i++)
-	{
-		itriangles[i].facesfront = LittleLong(itriangles[i].facesfront);
-		itriangles[i].vertices[0] = LittleLong(itriangles[i].vertices[0]);
-		itriangles[i].vertices[1] = LittleLong(itriangles[i].vertices[1]);
-		itriangles[i].vertices[2] = LittleLong(itriangles[i].vertices[2]);
-	}
-
-/* load into a real model */
+/* read frames */
 	model.num_frames = header->numframes;
 	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
 
-/* count total frames */
-	model.total_frames = mdl_counttotalframes(f, header->numframes, header->numverts);
+	model.total_frames = g_mdl_totalframes; /* set by swap_mdl */
 
-/* read frames */
 	offset = 0;
 
-	framevertstart = (mdl_trivertx_t**)qmalloc(sizeof(mdl_trivertx_t*) * model.total_frames);
+	framevertstart = (trivertx_t**)qmalloc(sizeof(trivertx_t*) * model.total_frames);
 	for (i = 0; i < header->numframes; i++)
 	{
-		int type = LittleLong(*(int*)f);
+		daliasframetype_t *frametype = (daliasframetype_t*)f;
+		f += sizeof(daliasframetype_t);
 
-		f += sizeof(int);
-
-		if (type == ALIAS_SINGLE)
+		if (frametype->type == ALIAS_SINGLE)
 		{
+		/* ordinary frame */
 			model.frameinfo[i].frametime = 0.1f;
 
 			model.frameinfo[i].num_frames = 1;
@@ -346,18 +408,18 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 		else
 		{
+		/* frame group */
 			daliasgroup_t *group;
 			daliasinterval_t *intervals;
 
 			group = (daliasgroup_t*)f;
 			f += sizeof(daliasgroup_t);
-			group->numframes = LittleLong(group->numframes);
 
 			intervals = (daliasinterval_t*)f;
 			f += group->numframes * sizeof(daliasinterval_t);
 
 		/* load into model */
-			model.frameinfo[i].frametime = LittleFloat(intervals[0].interval);
+			model.frameinfo[i].frametime = max(0.01f, intervals[0].interval);
 
 			model.frameinfo[i].num_frames = group->numframes;
 			model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t) * group->numframes);
@@ -373,8 +435,8 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 			model.frameinfo[i].frames[j].name = copystring(sframe->name);
 
-			framevertstart[model.frameinfo[i].frames[j].offset] = (mdl_trivertx_t*)f;
-			f += header->numverts * sizeof(mdl_trivertx_t);
+			framevertstart[model.frameinfo[i].frames[j].offset] = (trivertx_t*)f;
+			f += header->numverts * sizeof(trivertx_t);
 		}
 
 		offset += model.frameinfo[i].num_frames;
@@ -390,7 +452,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	model.synctype = header->synctype;
 
 	mesh = &model.meshes[0];
-	mesh_initialize(mesh);
+	mesh_initialize(&model, mesh);
 
 	mesh->name = copystring("mdlmesh");
 
@@ -406,11 +468,11 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			int vertnum;
 			mdl_meshvert_t *mv;
 
-			int xyz = itriangles[i].vertices[j];
+			int xyz = dtriangles[i].vertindex[j];
 
 			int s = stverts[xyz].s;
 			int t = stverts[xyz].t;
-			int back = stverts[xyz].onseam && !itriangles[i].facesfront;
+			int back = stverts[xyz].onseam && !dtriangles[i].facesfront;
 
 		/* add the vertex if it doesn't exist, otherwise use the old one */
 			for (vertnum = 0, mv = meshverts; vertnum < mesh->num_vertices; vertnum++, mv++)
@@ -456,11 +518,11 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 			for (k = 0; k < mesh->num_vertices; k++, v += 3, n += 3)
 			{
-				const mdl_trivertx_t *trivertx = &framevertstart[model.frameinfo[i].frames[j].offset][meshverts[k].vertex];
+				const trivertx_t *trivertx = &framevertstart[model.frameinfo[i].frames[j].offset][meshverts[k].vertex];
 
-				v[0] = header->origin[0] + header->scale[0] * trivertx->packedposition[0];
-				v[1] = header->origin[1] + header->scale[1] * trivertx->packedposition[1];
-				v[2] = header->origin[2] + header->scale[2] * trivertx->packedposition[2];
+				v[0] = header->origin[0] + header->scale[0] * trivertx->v[0];
+				v[1] = header->origin[1] + header->scale[1] * trivertx->v[1];
+				v[2] = header->origin[2] + header->scale[2] * trivertx->v[2];
 
 				n[0] = anorms[trivertx->lightnormalindex][0];
 				n[1] = anorms[trivertx->lightnormalindex][1];
@@ -472,42 +534,46 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	qfree(meshverts);
 	qfree(framevertstart);
 
-	mesh->skins[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
-	mesh->skins[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
-
-	for (i = 0; i < header->skinwidth * header->skinheight; i++)
+	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.total_skins);
+	for (i = 0; i < model.total_skins; i++)
 	{
-		unsigned char c = skins[0].skin[i];
+		mesh->textures[i].components[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
+		mesh->textures[i].components[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
 
-		if (quakepalette.fullbright_flags[c >> 5] & (1U << (c & 31)))
+		for (j = 0; j < header->skinwidth * header->skinheight; j++)
 		{
-		/* fullbright */
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+0] = 0;
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+1] = 0;
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+2] = 0;
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+3] = 255;
+			unsigned char c = skintexstart[i][j];
 
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+3] = 255;
-		}
-		else
-		{
-		/* normal colour */
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+0] = quakepalette.rgb[c*3+0];
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+1] = quakepalette.rgb[c*3+1];
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+2] = quakepalette.rgb[c*3+2];
-			mesh->skins[SKIN_DIFFUSE]->pixels[i*4+3] = 255;
+			if (quakepalette.fullbright_flags[c >> 5] & (1U << (c & 31)))
+			{
+			/* fullbright */
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = 0;
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = 0;
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = 0;
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
 
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+0] = 0;
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+1] = 0;
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+2] = 0;
-			mesh->skins[SKIN_FULLBRIGHT]->pixels[i*4+3] = 255;
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+			}
+			else
+			{
+			/* normal colour */
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
+				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
+
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = 0;
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = 0;
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = 0;
+				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+			}
 		}
 	}
 
-	qfree(skins);
+	qfree(skintexstart);
 
 	*out_model = model;
 	return true;
@@ -523,21 +589,39 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	float mins[3], maxs[3], dist[3], totalsize;
 	mdl_header_t *header;
 	int i, j, k;
-	image_paletted_t *pimage;
+	int skinwidth, skinheight;
+	image_paletted_t **skinimages;
 
 	if (model->num_meshes != 1)
 	{
-	/* FIXME - create a function to combine meshes so that this can be done */
+	/* FIXME - combine the meshes temporarily */
 		printf("model_mdl_save: model must have only one mesh\n");
 		return false;
 	}
 
-	/* FIXME - resample fullbright skin to match diffuse skin size */
+	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
 
 	mesh = &model->meshes[0];
 
-/* create 8-bit texture */
-	pimage = image_palettize(&quakepalette, mesh->skins[SKIN_DIFFUSE], mesh->skins[SKIN_FULLBRIGHT]);
+/* create 8-bit textures */
+	skinwidth = 0;
+	skinheight = 0;
+	skinimages = (image_paletted_t**)qmalloc(sizeof(image_paletted_t*) * model->total_skins);
+
+	for (i = 0; i < model->num_skins; i++)
+	{
+		const skininfo_t *skininfo = &model->skininfo[i];
+
+		for (j = 0; j < skininfo->num_skins; j++)
+		{
+			int offset = skininfo->skins[j].offset;
+
+			skinimages[offset] = image_palettize(&quakepalette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+
+			skinwidth = skinimages[offset]->width;
+			skinheight = skinimages[offset]->height;
+		}
+	}
 
 /* calculate bounds */
 	mins[0] = mins[1] = mins[2] = maxs[0] = maxs[1] = maxs[2] = 0.0f;
@@ -590,9 +674,9 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offsets[0] = 0; /* FIXME */
 	header->offsets[1] = 0; /* FIXME */
 	header->offsets[2] = 0; /* FIXME */
-	header->numskins = 1; /* FIXME */
-	header->skinwidth = pimage->width;
-	header->skinheight = pimage->height;
+	header->numskins = model->num_skins;
+	header->skinwidth = skinwidth;
+	header->skinheight = skinheight;
 	header->numverts = mesh->num_vertices;
 	header->numtris = mesh->num_triangles;
 	header->numframes = model->num_frames;
@@ -603,65 +687,95 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	f += sizeof(mdl_header_t);
 
 /* write skins */
+	for (i = 0; i < model->num_skins; i++)
 	{
-		mdl_skin_t *skin = (mdl_skin_t*)f;
+		const skininfo_t *skininfo = &model->skininfo[i];
+		daliasskintype_t *skintype;
 
-		skin->group = 0;
+		skintype = (daliasskintype_t*)f;
+		f += sizeof(daliasskintype_t);
 
-		f += sizeof(mdl_skin_t) - sizeof(skin->skin);
+		if (skininfo->num_skins > 1)
+		{
+		/* skin group */
+			daliasskingroup_t *group;
+			daliasskininterval_t *intervals;
 
-		memcpy(f, pimage->pixels, header->skinwidth * header->skinheight);
-		f += header->skinwidth * header->skinheight;
+			skintype->type = ALIAS_SKIN_GROUP;
+
+			group = (daliasskingroup_t*)f;
+			group->numskins = skininfo->num_skins;
+			f += sizeof(daliasskingroup_t);
+
+			intervals = (daliasskininterval_t*)f;
+			for (j = 0; j < skininfo->num_skins; j++)
+				intervals[j].interval = skininfo->frametime * (j + 1);
+			f += skininfo->num_skins * sizeof(daliasskininterval_t);
+		}
+		else
+		{
+		/* single skin */
+			skintype->type = ALIAS_SKIN_SINGLE;
+		}
+
+		for (j = 0; j < skininfo->num_skins; j++)
+		{
+			memcpy(f, skinimages[skininfo->skins[j].offset]->pixels, header->skinwidth * header->skinheight);
+			f += header->skinwidth * header->skinheight;
+		}
 	}
 
 /* write texcoords */
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		mdl_stvert_t *stvert = (mdl_stvert_t*)f;
+		stvert_t *stvert = (stvert_t*)f;
 
 		stvert->onseam = 0;
 		stvert->s = (int)(mesh->texcoord2f[i*2+0] * header->skinwidth);
 		stvert->t = (int)(mesh->texcoord2f[i*2+1] * header->skinheight);
 
-		f += sizeof(mdl_stvert_t);
+		f += sizeof(stvert_t);
 	}
 
 /* write triangles */
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
-		mdl_itriangle_t *itriangle = (mdl_itriangle_t*)f;
+		dtriangle_t *dtriangle = (dtriangle_t*)f;
 
-		itriangle->facesfront = 1;
-		itriangle->vertices[0] = mesh->triangle3i[i*3+0];
-		itriangle->vertices[1] = mesh->triangle3i[i*3+1];
-		itriangle->vertices[2] = mesh->triangle3i[i*3+2];
+		dtriangle->facesfront = 1;
+		dtriangle->vertindex[0] = mesh->triangle3i[i*3+0];
+		dtriangle->vertindex[1] = mesh->triangle3i[i*3+1];
+		dtriangle->vertindex[2] = mesh->triangle3i[i*3+2];
 
-		f += sizeof(mdl_itriangle_t);
+		f += sizeof(dtriangle_t);
 	}
 
 /* write frames */
 	for (i = 0; i < model->num_frames; i++)
 	{
 		const frameinfo_t *frameinfo = &model->frameinfo[i];
+		daliasframetype_t *frametype;
 		daliasgroup_t *aliasgroup = NULL;
+
+		frametype = (daliasframetype_t*)f;
+		f += sizeof(daliasframetype_t);
 
 		if (frameinfo->num_frames > 1)
 		{
-		/* framegroup */
+		/* frame group */
 			daliasinterval_t *intervals;
 
-			*(int*)f = ALIAS_GROUP;
-			f += sizeof(int);
+			frametype->type = ALIAS_GROUP;
 
 			aliasgroup = (daliasgroup_t*)f;
 
-			aliasgroup->bboxmin.packedposition[0] = 0; /* these will be set later */
-			aliasgroup->bboxmin.packedposition[1] = 0;
-			aliasgroup->bboxmin.packedposition[2] = 0;
+			aliasgroup->bboxmin.v[0] = 0; /* these will be set later */
+			aliasgroup->bboxmin.v[1] = 0;
+			aliasgroup->bboxmin.v[2] = 0;
 			aliasgroup->bboxmin.lightnormalindex = 0;
-			aliasgroup->bboxmax.packedposition[0] = 0;
-			aliasgroup->bboxmax.packedposition[1] = 0;
-			aliasgroup->bboxmax.packedposition[2] = 0;
+			aliasgroup->bboxmax.v[0] = 0;
+			aliasgroup->bboxmax.v[1] = 0;
+			aliasgroup->bboxmax.v[2] = 0;
 			aliasgroup->bboxmax.lightnormalindex = 0;
 			aliasgroup->numframes = frameinfo->num_frames;
 
@@ -674,26 +788,26 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		}
 		else
 		{
-			*(int*)f = ALIAS_SINGLE;
-			f += sizeof(int);
+		/* single frame */
+			frametype->type = ALIAS_SINGLE;
 		}
 
 		for (j = 0; j < frameinfo->num_frames; j++)
 		{
 			daliasframe_t *simpleframe;
-			mdl_trivertx_t *trivertx;
+			trivertx_t *trivertx;
 			int offset = frameinfo->frames[j].offset;
 			const float *v, *n;
 
 			simpleframe = (daliasframe_t*)f;
 
-			simpleframe->bboxmin.packedposition[0] = 0; /* these will be set in the following loop */
-			simpleframe->bboxmin.packedposition[1] = 0;
-			simpleframe->bboxmin.packedposition[2] = 0;
+			simpleframe->bboxmin.v[0] = 0; /* these will be set in the following loop */
+			simpleframe->bboxmin.v[1] = 0;
+			simpleframe->bboxmin.v[2] = 0;
 			simpleframe->bboxmin.lightnormalindex = 0;
-			simpleframe->bboxmax.packedposition[0] = 0;
-			simpleframe->bboxmax.packedposition[1] = 0;
-			simpleframe->bboxmax.packedposition[2] = 0;
+			simpleframe->bboxmax.v[0] = 0;
+			simpleframe->bboxmax.v[1] = 0;
+			simpleframe->bboxmax.v[2] = 0;
 			simpleframe->bboxmax.lightnormalindex = 0;
 			strlcpy(simpleframe->name, frameinfo->frames[j].name, sizeof(simpleframe->name));
 
@@ -701,7 +815,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 
 			v = mesh->vertex3f + offset * mesh->num_vertices * 3;
 			n = mesh->normal3f + offset * mesh->num_vertices * 3;
-			trivertx = (mdl_trivertx_t*)f;
+			trivertx = (trivertx_t*)f;
 
 			for (k = 0; k < mesh->num_vertices; k++, v += 3, n += 3, trivertx++)
 			{
@@ -711,49 +825,51 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 				pos[1] = (v[1] - header->origin[1]) / header->scale[1];
 				pos[2] = (v[2] - header->origin[2]) / header->scale[2];
 
-				trivertx->packedposition[0] = (unsigned char)bound(0.0f, pos[0], 255.0f);
-				trivertx->packedposition[1] = (unsigned char)bound(0.0f, pos[1], 255.0f);
-				trivertx->packedposition[2] = (unsigned char)bound(0.0f, pos[2], 255.0f);
+				trivertx->v[0] = (unsigned char)bound(0.0f, pos[0], 255.0f);
+				trivertx->v[1] = (unsigned char)bound(0.0f, pos[1], 255.0f);
+				trivertx->v[2] = (unsigned char)bound(0.0f, pos[2], 255.0f);
 				trivertx->lightnormalindex = compress_normal(n);
 
-				if (k == 0 || trivertx->packedposition[0] < simpleframe->bboxmin.packedposition[0])
-					simpleframe->bboxmin.packedposition[0] = trivertx->packedposition[0];
-				if (k == 0 || trivertx->packedposition[1] < simpleframe->bboxmin.packedposition[1])
-					simpleframe->bboxmin.packedposition[1] = trivertx->packedposition[1];
-				if (k == 0 || trivertx->packedposition[2] < simpleframe->bboxmin.packedposition[2])
-					simpleframe->bboxmin.packedposition[2] = trivertx->packedposition[2];
+				if (k == 0 || trivertx->v[0] < simpleframe->bboxmin.v[0])
+					simpleframe->bboxmin.v[0] = trivertx->v[0];
+				if (k == 0 || trivertx->v[1] < simpleframe->bboxmin.v[1])
+					simpleframe->bboxmin.v[1] = trivertx->v[1];
+				if (k == 0 || trivertx->v[2] < simpleframe->bboxmin.v[2])
+					simpleframe->bboxmin.v[2] = trivertx->v[2];
 
-				if (k == 0 || trivertx->packedposition[0] > simpleframe->bboxmax.packedposition[0])
-					simpleframe->bboxmax.packedposition[0] = trivertx->packedposition[0];
-				if (k == 0 || trivertx->packedposition[1] > simpleframe->bboxmax.packedposition[1])
-					simpleframe->bboxmax.packedposition[1] = trivertx->packedposition[1];
-				if (k == 0 || trivertx->packedposition[2] > simpleframe->bboxmax.packedposition[2])
-					simpleframe->bboxmax.packedposition[2] = trivertx->packedposition[2];
+				if (k == 0 || trivertx->v[0] > simpleframe->bboxmax.v[0])
+					simpleframe->bboxmax.v[0] = trivertx->v[0];
+				if (k == 0 || trivertx->v[1] > simpleframe->bboxmax.v[1])
+					simpleframe->bboxmax.v[1] = trivertx->v[1];
+				if (k == 0 || trivertx->v[2] > simpleframe->bboxmax.v[2])
+					simpleframe->bboxmax.v[2] = trivertx->v[2];
 
 				if (aliasgroup)
 				{
-					if ((j == 0 && k == 0) || trivertx->packedposition[0] < aliasgroup->bboxmin.packedposition[0])
-						aliasgroup->bboxmin.packedposition[0] = trivertx->packedposition[0];
-					if ((j == 0 && k == 0) || trivertx->packedposition[1] < aliasgroup->bboxmin.packedposition[1])
-						aliasgroup->bboxmin.packedposition[1] = trivertx->packedposition[1];
-					if ((j == 0 && k == 0) || trivertx->packedposition[2] < aliasgroup->bboxmin.packedposition[2])
-						aliasgroup->bboxmin.packedposition[2] = trivertx->packedposition[2];
+					if ((j == 0 && k == 0) || trivertx->v[0] < aliasgroup->bboxmin.v[0])
+						aliasgroup->bboxmin.v[0] = trivertx->v[0];
+					if ((j == 0 && k == 0) || trivertx->v[1] < aliasgroup->bboxmin.v[1])
+						aliasgroup->bboxmin.v[1] = trivertx->v[1];
+					if ((j == 0 && k == 0) || trivertx->v[2] < aliasgroup->bboxmin.v[2])
+						aliasgroup->bboxmin.v[2] = trivertx->v[2];
 
-					if ((j == 0 && k == 0) || trivertx->packedposition[0] > aliasgroup->bboxmax.packedposition[0])
-						aliasgroup->bboxmax.packedposition[0] = trivertx->packedposition[0];
-					if ((j == 0 && k == 0) || trivertx->packedposition[1] > aliasgroup->bboxmax.packedposition[1])
-						aliasgroup->bboxmax.packedposition[1] = trivertx->packedposition[1];
-					if ((j == 0 && k == 0) || trivertx->packedposition[2] > aliasgroup->bboxmax.packedposition[2])
-						aliasgroup->bboxmax.packedposition[2] = trivertx->packedposition[2];
+					if ((j == 0 && k == 0) || trivertx->v[0] > aliasgroup->bboxmax.v[0])
+						aliasgroup->bboxmax.v[0] = trivertx->v[0];
+					if ((j == 0 && k == 0) || trivertx->v[1] > aliasgroup->bboxmax.v[1])
+						aliasgroup->bboxmax.v[1] = trivertx->v[1];
+					if ((j == 0 && k == 0) || trivertx->v[2] > aliasgroup->bboxmax.v[2])
+						aliasgroup->bboxmax.v[2] = trivertx->v[2];
 				}
 			}
 
-			f += mesh->num_vertices * sizeof(mdl_trivertx_t);
+			f += mesh->num_vertices * sizeof(trivertx_t);
 		}
 	}
 
 /* done */
-	qfree(pimage);
+	for (i = 0; i < model->total_skins; i++)
+		qfree(skinimages[i]);
+	qfree(skinimages);
 
 	swap_mdl(data, f - (unsigned char*)data);
 	*out_data = data;

@@ -23,6 +23,20 @@
 #include "matrix.h"
 #include "image.h"
 
+typedef struct singleskin_s
+{
+	char *name;
+	int offset; /* how many "actual skins" into the mesh skin lumps */
+} singleskin_t;
+
+typedef struct skininfo_s
+{
+	int num_skins;
+	singleskin_t *skins;
+
+	float frametime; /* 0.1 for single skins, otherwise based on MDL skingroup interval */
+} skininfo_t;
+
 typedef struct singleframe_s
 {
 	char *name;
@@ -34,7 +48,7 @@ typedef struct frameinfo_s
 	int num_frames;
 	singleframe_t *frames;
 
-	float frametime; /* 0.1 for single frames, otherwise based on framegroup interval */
+	float frametime; /* 0.1 for single frames, otherwise based on MDL framegroup interval */
 } frameinfo_t;
 
 typedef struct tag_s
@@ -52,6 +66,11 @@ typedef enum skintype_e
 	SKIN_NUMTYPES
 } skintype_t;
 
+typedef struct texture_s
+{
+	image_rgba_t *components[SKIN_NUMTYPES];
+} texture_t;
+
 typedef struct mesh_s
 {
 	char *name;
@@ -65,7 +84,7 @@ typedef struct mesh_s
 
 	int *triangle3i;
 
-	image_rgba_t *skins[SKIN_NUMTYPES];
+	texture_t *textures; /* [model.total_skins] */
 
 	struct
 	{
@@ -73,19 +92,25 @@ typedef struct mesh_s
 
 	/* the texture may need to be padded to power-of-two dimensions to be rendered, so we need extra texturing information */
 	/* each texture layer might be a different size, so we may have multiple sets of differently-padded texcoords... */
-		struct
+		struct renderdata_texture
 		{
-			float *texcoord2f;
-			image_rgba_t *image;
-			unsigned int handle;
-		} skins[SKIN_NUMTYPES];
+			struct
+			{
+				float *texcoord2f;
+				image_rgba_t *image;
+				unsigned int handle;
+			} components[SKIN_NUMTYPES];
+		} *textures; /* [model.total_skins] */
 	} renderdata;
 } mesh_t;
 
 typedef struct model_s
 {
-	int total_frames; /* including framegroup frames */
+	int total_skins; /* including skingroup frames */
+	int num_skins;
+	skininfo_t *skininfo;
 
+	int total_frames; /* including framegroup frames */
 	int num_frames;
 	frameinfo_t *frameinfo;
 
@@ -96,13 +121,13 @@ typedef struct model_s
 	tag_t *tags;
 
 	int flags; /* quake only */
-	int synctype; /* quake only */
+	int synctype; /* quake only, possible values: 0 (sync), 1 (rand) */
 } model_t;
 
-void mesh_initialize(mesh_t *mesh);
-void mesh_free(mesh_t *mesh);
-void mesh_generaterenderdata(mesh_t *mesh);
-void mesh_freerenderdata(mesh_t *mesh);
+void mesh_initialize(model_t *model, mesh_t *mesh);
+void mesh_free(model_t *model, mesh_t *mesh);
+void mesh_generaterenderdata(model_t *model, mesh_t *mesh);
+void mesh_freerenderdata(model_t *model, mesh_t *mesh);
 
 void model_initialize(model_t *model);
 void model_free(model_t *model);

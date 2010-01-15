@@ -57,7 +57,7 @@ typedef struct md3_header_s
 
 	char name[64];
 
-	int flags; /* ? */
+	int flags; /* unused by quake3, darkplaces uses it for quake-style modelflags (rocket trails, etc.) */
 
 	int num_frames;
 	int num_tags;
@@ -77,7 +77,7 @@ typedef struct md3_mesh_s
 
 	char name[64];
 
-	int flags; /* ? */
+	int flags; /* unused */
 
 	int num_frames;
 	int num_shaders;
@@ -218,6 +218,16 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	printf("header numskins: %d\n", header->num_skins);
 
+/* read skins */
+	model.total_skins = 1;
+	model.num_skins = 1;
+	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+	model.skininfo[0].frametime = 0.1f;
+	model.skininfo[0].num_skins = 1;
+	model.skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+	model.skininfo[0].skins[0].name = copystring("skin");
+	model.skininfo[0].skins[0].offset = 0;
+
 /* read frames */
 	model.total_frames = header->num_frames;
 
@@ -287,17 +297,9 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		mesh_t *mesh = &model.meshes[i];
 		md3_vertex_t *md3_vertex;
 
-		if (memcmp(md3_mesh->ident, "IDP3", 4))
-		{
-			if (out_error)
-				*out_error = msprintf("mesh has wrong ident (not IDP3)");
-			/* FIXME - free everything */
-			return false;
-		}
-
 		printf("mesh %d: \"%s\"\n", i, md3_mesh->name);
 
-		mesh_initialize(mesh);
+		mesh_initialize(&model, mesh);
 
 		mesh->name = copystring(md3_mesh->name);
 
@@ -341,12 +343,15 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);
 		}
 
-	/* FIXME - load skin? */
+	/* load skin */
+		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
+		for (j = 0; j < SKIN_NUMTYPES; j++)
+			mesh->textures[0].components[j] = NULL;
 
 		f += md3_mesh->lump_end;
 	}
 
-	model.flags = header->flags; /* FIXME - i'm not actually sure what the md3 flags are for */
+	model.flags = header->flags;
 	model.synctype = 0;
 
 	*out_model = model;

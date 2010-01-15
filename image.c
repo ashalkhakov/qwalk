@@ -21,6 +21,7 @@
 #include "global.h"
 #include "image.h"
 
+/* FIXME - return the error */
 image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize)
 {
 	const char *ext = strrchr(filename, '.');
@@ -128,7 +129,7 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 		return NULL;
 	pimage->width = source_diffuse->width;
 	pimage->height = source_diffuse->height;
-	pimage->pixels = (unsigned char*)qmalloc(pimage->width * pimage->height);
+	pimage->pixels = (unsigned char*)(pimage + 1);
 	pimage->palette = *palette;
 
 	palette_has_fullbrights = false;

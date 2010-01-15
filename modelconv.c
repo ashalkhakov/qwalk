@@ -60,7 +60,7 @@ bool_t replacetexture(const char *filename)
 	size_t filesize;
 	char *error;
 	image_rgba_t *image;
-	int i, j;
+	int i, j, k;
 	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
@@ -82,10 +82,13 @@ bool_t replacetexture(const char *filename)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		for (j = 0; j < SKIN_NUMTYPES; j++)
-			image_free(&mesh->skins[j]);
+		for (j = 0; j < model->total_skins; j++)
+		{
+			for (k = 0; k < SKIN_NUMTYPES; k++)
+				image_free(&mesh->textures[j].components[k]); /* this also sets the image to NULL */
 
-		mesh->skins[SKIN_DIFFUSE] = image_clone(image);
+			mesh->textures[j].components[SKIN_DIFFUSE] = image_clone(image);
+		}
 	}
 
 	image_free(&image);
@@ -232,7 +235,7 @@ void dump_txt(const char *filename, const model_t *model)
 
 int main(int argc, char **argv)
 {
-	int i;
+	int i, j;
 	mesh_t *mesh;
 
 	set_atexit_final_event(dumpleaks);
@@ -357,13 +360,16 @@ int main(int argc, char **argv)
 
 	if (texwidth > 0 || texheight > 0)
 	{
-		for (i = 0; i < SKIN_NUMTYPES; i++)
+		for (i = 0; i < model->total_skins; i++)
 		{
-			if (mesh->skins[i])
+			for (j = 0; j < SKIN_NUMTYPES; j++)
 			{
-				image_rgba_t *oldimage = mesh->skins[i];
-				mesh->skins[i] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
-				image_free(&oldimage);
+				if (mesh->textures[i].components[j])
+				{
+					image_rgba_t *oldimage = mesh->textures[i].components[j];
+					mesh->textures[i].components[j] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
+					image_free(&oldimage);
+				}
 			}
 		}
 	}
