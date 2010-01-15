@@ -53,6 +53,7 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error);
 image_rgba_t *image_jpeg_load(void *filedata, size_t filesize, char **out_error);
 
 size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t filesize);
+size_t image_tga_save(const image_rgba_t *image, void *filedata, size_t filesize);
 
 image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
 image_rgba_t *image_pad(const image_rgba_t *source, int width, int height);

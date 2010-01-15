@@ -18,6 +18,8 @@
 /* TGA loading code hastily ripped from DarkPlaces */
 /* TODO - rewrite it to be shorter, speed isn't as important when we're not loading hundreds of them */
 
+#include <string.h>
+
 #include "global.h"
 #include "image.h"
 
@@ -430,4 +432,75 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 	}
 
 	return image;
+}
+
+size_t image_tga_save(const image_rgba_t *image, void *filedata, size_t filesize)
+{
+	bool_t hasalpha;
+	unsigned char *f = (unsigned char*)filedata;
+	int x, y, i;
+	int runlen;
+
+	hasalpha = false;
+	for (i = 0; i < image->width * image->height; i++)
+		if (image->pixels[i*4+3] != 0xff)
+			hasalpha = true;
+
+	memset(f, 0, 18);
+	f[2] = 10; /* compressed BGR(A) */
+	f[12] = image->width & 0xff;
+	f[13] = (image->width >> 8) & 0xff;
+	f[14] = image->height & 0xff;
+	f[15] = (image->height >> 8) & 0xff;
+	f[16] = hasalpha ? 32 : 24;
+	f[17] = hasalpha ? 8 : 0;
+
+	f += 18;
+
+/* don't let runs span multiple lines, because apparently that's against the specs */
+	for (y = 0; y < image->height; y++)
+	{
+		const unsigned char *pix = image->pixels + (image->height - 1 - y) * image->width * 4; /* store bottom to top */
+
+		for (x = 0; x < image->width; x += runlen)
+		{
+		/* count how many identical pixels in a row */
+			for (runlen = 1; runlen < 128 && x + runlen < image->width; runlen++)
+				if (pix[x*4+0] != pix[(x+runlen)*4+0] || pix[x*4+1] != pix[(x+runlen)*4+1] || pix[x*4+2] != pix[(x+runlen)*4+2] || pix[x*4+3] != pix[(x+runlen)*4+3])
+					break;
+
+			if (runlen == 1)
+			{
+			/* count how many unique pixels in a row */
+				for (runlen = 1; runlen < 128 && x + runlen < image->width; runlen++)
+					if (pix[(x+runlen-1)*4+0] == pix[(x+runlen)*4+0] && pix[(x+runlen-1)*4+1] == pix[(x+runlen)*4+1] && pix[(x+runlen-1)*4+2] == pix[(x+runlen)*4+2] && pix[(x+runlen-1)*4+3] == pix[(x+runlen)*4+3])
+						break;
+				if (runlen > 1)
+					runlen--; /* chop the last one off, since it's the beginning of a new run */
+
+				*f++ = runlen - 1;
+
+				for (i = x; i < x + runlen; i++)
+				{
+					*f++ = pix[i*4+2];
+					*f++ = pix[i*4+1];
+					*f++ = pix[i*4+0];
+					if (hasalpha)
+						*f++ = pix[i*4+3];
+				}
+			}
+			else
+			{
+				*f++ = 0x80 | (runlen - 1);
+
+				*f++ = pix[x*4+2];
+				*f++ = pix[x*4+1];
+				*f++ = pix[x*4+0];
+				if (hasalpha)
+					*f++ = pix[x*4+3];
+			}
+		}
+	}
+
+	return f - (unsigned char*)filedata;
 }
