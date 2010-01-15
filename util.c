@@ -369,11 +369,7 @@ void add_atexit_event(void (*function)(void))
 
 void set_atexit_final_event(void (*function)(void))
 {
-	if (atexit_final_event)
-	{
-		(*atexit_final_event)();
-		atexit_final_event = NULL;
-	}
+	atexit_final_event = function;
 }
 
 void call_atexit_events(void)
@@ -389,4 +385,10 @@ void call_atexit_events(void)
 
 	atexit_event_head = NULL;
 	atexit_event_tail = NULL;
+
+	if (atexit_final_event)
+	{
+		(*atexit_final_event)();
+		atexit_final_event = NULL;
+	}
 }
