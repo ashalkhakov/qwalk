@@ -113,6 +113,8 @@ void mesh_freerenderdata(model_t *model, mesh_t *mesh)
 	}
 
 	qfree(mesh->renderdata.textures);
+
+	mesh->renderdata.initialized = false;
 }
 
 void model_initialize(model_t *model)
