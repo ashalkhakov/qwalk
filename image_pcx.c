@@ -15,7 +15,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
 #include <string.h>
 
 #include "global.h"
@@ -53,7 +52,7 @@ static void swap_pcx_header(pcx_header_t *header)
 	header->palette_type = LittleShort(header->palette_type);
 }
 
-image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
+image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
@@ -75,43 +74,50 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
 
 	if (header->manufacturer != 0x0a)
 	{
-		printf("pcx: bad manufacturer\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad manufacturer");
 		return NULL;
 	}
 
 	if (header->version != 5)
 	{
-		printf("pcx: bad version\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad version");
 		return NULL;
 	}
 
 	if (header->encoding != 1)
 	{
-		printf("pcx: bad encoding\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad encoding");
 		return NULL;
 	}
 
 	if (header->bits_per_pixel != 8)
 	{
-		printf("pcx: bad bits_per_pixel\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad bits_per_pixel");
 		return NULL;
 	}
 
 	if (header->xmax - header->xmin + 1 < 1 || header->xmax - header->xmin + 1 > 4096)
 	{
-		printf("pcx: bad xmax\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad xmax");
 		return NULL;
 	}
 
 	if (header->ymax - header->ymin + 1 < 1 || header->ymax - header->ymin + 1 > 4096)
 	{
-		printf("pcx: bad ymax\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad ymax");
 		return NULL;
 	}
 
 	if (header->color_planes != 1)
 	{
-		printf("pcx: bad color_planes\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad color_planes");
 		return NULL;
 	}
 
@@ -121,14 +127,16 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize)
 	palette768 = (unsigned char*)filedata + filesize - 768;
 	if (palette768[-1] != 0x0c)
 	{
-		printf("pcx: bad palette format\n");
+		if (out_error)
+			*out_error = msprintf("pcx: bad palette format");
 		return NULL;
 	}
 
 	image = image_alloc(header->xmax - header->xmin + 1, header->ymax - header->ymin + 1);
 	if (!image)
 	{
-		printf("pcx: out of memory\n");
+		if (out_error)
+			*out_error = msprintf("pcx: out of memory");
 		return NULL;
 	}
 

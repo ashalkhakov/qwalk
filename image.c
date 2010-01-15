@@ -22,24 +22,26 @@
 #include "image.h"
 
 /* FIXME - return the error */
-image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize)
+image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error)
 {
 	const char *ext = strrchr(filename, '.');
 
 	if (!ext)
 	{
-		printf("%s: no file extension\n", filename);
+		if (out_error)
+			*out_error = msprintf("%s: no file extension", filename);
 		return NULL;
 	}
 
-	if (!strncasecmp(ext, ".pcx", 4))
-		return image_pcx_load(filedata, filesize);
-	if (!strncasecmp(ext, ".tga", 4))
-		return image_tga_load(filedata, filesize);
-	if (!strncasecmp(ext, ".jpg", 4) || !strncasecmp(ext, ".jpeg", 5))
-		return image_jpeg_load(filedata, filesize);
+	if (!strcasecmp(ext, ".pcx"))
+		return image_pcx_load(filedata, filesize, out_error);
+	if (!strcasecmp(ext, ".tga"))
+		return image_tga_load(filedata, filesize, out_error);
+	if (!strcasecmp(ext, ".jpg") || !strcasecmp(ext, ".jpeg"))
+		return image_jpeg_load(filedata, filesize, out_error);
 
-	printf("unrecognized file extension \"%s\"\n", ext);
+	if (out_error)
+		*out_error = msprintf("unrecognized file extension \"%s\"", ext);
 	return NULL;
 }
 

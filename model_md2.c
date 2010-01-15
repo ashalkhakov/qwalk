@@ -278,10 +278,10 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 			continue;
 		}
 
-		image = image_load(md2skins[i].name, filedata, filesize);
+		image = image_load(md2skins[i].name, filedata, filesize, &error);
 		if (!image)
 		{
-			printf("md2: failed to load image \"%s\"\n", md2skins[i].name);
+			printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
 			qfree(error);
 			qfree(filedata);
 			continue;
@@ -370,7 +370,7 @@ static char *md2_create_skin_filename(const char *skinname)
 {
 	const char *ext = strrchr(skinname, '.');
 
-	if (ext && !strcmp(ext, ".pcx"))
+	if (ext && !strcasecmp(ext, ".pcx"))
 		return copystring(skinname);
 	else
 		return msprintf("%s.pcx", skinname);

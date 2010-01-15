@@ -18,12 +18,10 @@
 /* TGA loading code hastily ripped from DarkPlaces */
 /* TODO - rewrite it to be shorter, speed isn't as important when we're not loading hundreds of them */
 
-#include <stdio.h>
-
 #include "global.h"
 #include "image.h"
 
-image_rgba_t *image_tga_load(void *filedata, size_t filesize)
+image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
@@ -69,13 +67,15 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 
 	if (width > 4096 || height > 4096 || width <= 0 || height <= 0)
 	{
-		printf("tga: bad dimensions\n");
+		if (out_error)
+			*out_error = msprintf("tga: bad dimensions");
 		return NULL;
 	}
 
 	if (attributes & 0x10) /* this bit indicates origin on the right, which we don't support */
 	{
-		printf("tga: bad origin (must be top left or bottom left)\n");
+		if (out_error)
+			*out_error = msprintf("tga: bad origin (must be top left or bottom left)");
 		return NULL;
 	}
 
@@ -92,7 +92,8 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 	switch (image_type)
 	{
 	default:
-		printf("tga: bad image type\n");
+		if (out_error)
+			*out_error = msprintf("tga: bad image type");
 		return NULL;
 
 	/* colormapped */
@@ -100,24 +101,28 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 	case 1:
 		if (pixel_size != 8)
 		{
-			printf("tga: bad pixel_size\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad pixel_size");
 			return NULL;
 		}
 		if (colormap_length != 256)
 		{
-			printf("tga: bad colormap_length\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad colormap_length");
 			return NULL;
 		}
 		if (colormap_index != 0)
 		{
-			printf("tga: bad colormap_index\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad colormap_index");
 			return NULL;
 		}
 
 		switch (colormap_size)
 		{
 		default:
-			printf("tga: bad colormap_size\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad colormap_size");
 			return NULL;
 		case 24:
 			for (x = 0; x < colormap_length; x++)
@@ -142,7 +147,8 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 		image = image_alloc(width, height);
 		if (!image)
 		{
-			printf("tga: out of memory\n");
+			if (out_error)
+				*out_error = msprintf("tga: out of memory");
 			return NULL;
 		}
 
@@ -250,14 +256,16 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 	case 2:
 		if (pixel_size != 24 && pixel_size != 32)
 		{
-			printf("tga: bad pixel_size\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad pixel_size");
 			return NULL;
 		}
 
 		image = image_alloc(width, height);
 		if (!image)
 		{
-			printf("tga: out of memory\n");
+			if (out_error)
+				*out_error = msprintf("tga: out of memory");
 			return NULL;
 		}
 
@@ -342,14 +350,16 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize)
 	case 3:
 		if (pixel_size != 8)
 		{
-			printf("tga: bad pixel_size\n");
+			if (out_error)
+				*out_error = msprintf("tga: bad pixel_size");
 			return NULL;
 		}
 
 		image = image_alloc(width, height);
 		if (!image)
 		{
-			printf("tga: out of memory\n");
+			if (out_error)
+				*out_error = msprintf("tga: out of memory");
 			return NULL;
 		}
 

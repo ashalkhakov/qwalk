@@ -510,11 +510,12 @@ static void JPEG_MemSrc(j_decompress_ptr cinfo, const unsigned char *buffer, siz
 
 static void JPEG_ErrorExit(j_common_ptr cinfo)
 {
+/* FIXME - figure out how to return this instead of printing it */
 	((struct jpeg_decompress_struct*)cinfo)->err->output_message(cinfo);
 	longjmp(error_in_jpeg, 1);
 }
 
-image_rgba_t *image_jpeg_load(void *filedata, size_t filesize)
+image_rgba_t *image_jpeg_load(void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image = NULL;
 	struct jpeg_decompress_struct cinfo;
@@ -525,7 +526,8 @@ image_rgba_t *image_jpeg_load(void *filedata, size_t filesize)
 
 	if (!jpeg_openlibrary())
 	{
-		printf("Failed to load libjpeg.\n");
+		if (out_error)
+			*out_error = msprintf("failed to load libjpeg.");
 		return NULL;
 	}
 
@@ -544,7 +546,8 @@ image_rgba_t *image_jpeg_load(void *filedata, size_t filesize)
 
 	if (width > 4096 || height > 4096 || width <= 0 || height <= 0)
 	{
-		printf("jpeg: bad dimensions\n");
+		if (out_error)
+			*out_error = msprintf("jpeg: bad dimensions");
 		return NULL;
 	}
 
@@ -557,7 +560,8 @@ image_rgba_t *image_jpeg_load(void *filedata, size_t filesize)
 		if (scanline)
 			qfree(scanline);
 
-		printf("jpeg: out of memory\n");
+		if (out_error)
+			*out_error = msprintf("jpeg: out of memory");
 		qjpeg_finish_decompress(&cinfo);
 		qjpeg_destroy_decompress(&cinfo);
 		return NULL;
@@ -618,5 +622,7 @@ error_caught:
 
 	qjpeg_destroy_decompress(&cinfo);
 
+	if (out_error)
+		*out_error = msprintf("jpeg: an error occurred");
 	return NULL;
 }

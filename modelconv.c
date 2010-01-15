@@ -43,11 +43,11 @@ enum format identify_extension(const char *filename)
 
 	if ((ext = strrchr(filename, '.')))
 	{
-		if (!strcmp(ext, ".mdl"))
+		if (!strcasecmp(ext, ".mdl"))
 			return FMT_MDL;
-		if (!strcmp(ext, ".md2"))
+		if (!strcasecmp(ext, ".md2"))
 			return FMT_MD2;
-		if (!strcmp(ext, ".txt"))
+		if (!strcasecmp(ext, ".txt"))
 			return FMT_TXT;
 	}
 
@@ -70,10 +70,11 @@ bool_t replacetexture(const char *filename)
 		return false;
 	}
 
-	image = image_load(filename, filedata, filesize);
+	image = image_load(filename, filedata, filesize, &error);
 	if (!image)
 	{
-		fprintf(stderr, "Failed to load %s.\n", filename);
+		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
+		qfree(error);
 		qfree(filedata);
 		return false;
 	}

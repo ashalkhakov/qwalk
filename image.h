@@ -40,7 +40,7 @@ typedef struct image_paletted_s
 	unsigned char *pixels;
 } image_paletted_t;
 
-image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize);
+image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error);
 
 image_rgba_t *image_alloc(int width, int height);
 void image_free(image_rgba_t **image);
@@ -48,9 +48,9 @@ void image_free(image_rgba_t **image);
 image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 image_rgba_t *image_clone(const image_rgba_t *source);
 
-image_rgba_t *image_pcx_load(void *filedata, size_t filesize);
-image_rgba_t *image_tga_load(void *filedata, size_t filesize);
-image_rgba_t *image_jpeg_load(void *filedata, size_t filesize);
+image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_jpeg_load(void *filedata, size_t filesize, char **out_error);
 
 size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t filesize);
 

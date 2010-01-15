@@ -681,10 +681,11 @@ bool_t replacetexture(const char *filename)
 		return false;
 	}
 
-	image = image_load(filename, filedata, filesize);
+	image = image_load(filename, filedata, filesize, &error);
 	if (!image)
 	{
-		fprintf(stderr, "Failed to load %s.\n", filename);
+		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
+		qfree(error);
 		qfree(filedata);
 		return false;
 	}

@@ -174,11 +174,11 @@ bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t
 		return false;
 	}
 
-	if (!strncasecmp(ext, ".mdl", 4))
+	if (!strcasecmp(ext, ".mdl"))
 		return model_mdl_load(filedata, filesize, out_model, out_error);
-	if (!strncasecmp(ext, ".md2", 4))
+	if (!strcasecmp(ext, ".md2"))
 		return model_md2_load(filedata, filesize, out_model, out_error);
-	if (!strncasecmp(ext, ".md3", 4))
+	if (!strcasecmp(ext, ".md3"))
 		return model_md3_load(filedata, filesize, out_model, out_error);
 
 	if (out_error)
