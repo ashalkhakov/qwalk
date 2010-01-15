@@ -21,7 +21,6 @@
 #include "global.h"
 #include "image.h"
 
-/* FIXME - return the error */
 image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error)
 {
 	const char *ext = strrchr(filename, '.');
