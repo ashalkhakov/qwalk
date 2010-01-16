@@ -8,7 +8,6 @@ Features: import mdl, md2, or md3; export mdl.
 - Merge meshes with different textures.
 - When exporting MD2, merge all vertices with the same normal but different
   texcoords, since texcoords are stored per-triangle.
-- Fix the image resize function to work when scaling up.
 - Fix byte swapping.
 
  +----+

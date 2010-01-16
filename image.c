@@ -176,89 +176,165 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 	return pimage;
 }
 
-/* FIXME - incomplete - will fail if you try to make an image bigger */
-image_rgba_t *image_resize(const image_rgba_t *source, int width, int height)
+/* FIXME - rewrite the minification code... it's ugly, probably slow, and maybe also has some weighting issues */
+image_rgba_t *image_resize(const image_rgba_t *source, int newwidth, int newheight)
 {
+	image_rgba_t *intermediate;
 	image_rgba_t *image;
-	int x, y;
+	int x, y, i;
 
-	image = image_alloc(width, height);
-	if (!image)
+	intermediate = image_alloc(newwidth, source->height);
+	if (!intermediate)
 		return NULL;
 
-	for (y = 0; y < height; y++)
+	image = image_alloc(newwidth, newheight);
+	if (!image)
 	{
-		unsigned char *out = image->pixels + y * width * 4;
-		int y1, y2, yy;
+		image_free(&intermediate);
+		return NULL;
+	}
 
-		yy = ((y * source->height + source->height / 2) / height);
-		y1 = (((y - 1) * source->height + source->height / 2) / height); if (y1 < 0) y1 = 0;
-		y2 = (((y + 1) * source->height + source->height / 2) / height); if (y1 > source->height - 1) y1 = source->height - 1;
-
-		for (x = 0; x < width; x++)
+/* horizontal resize */
+	if (newwidth > source->width)
+	{
+		for (x = 0; x < newwidth; x++)
 		{
-			int x1, x2, xx;
-			int i, j;
-			int colour[4];
-			int num;
+			float fx = (float)x * (float)source->width / (float)newwidth;
+			int x1 = (int)fx;
+			int x2 = min(x1 + 1, source->width - 1);
+			float fx2 = fx - (float)x1;
+			float fx1 = 1.0f - fx2;
+			int ifx1 = (int)(fx1 * 256.0f);
+			int ifx2 = (int)(fx2 * 256.0f);
+			unsigned char *out = intermediate->pixels + x * 4;
+			const unsigned char *in1 = source->pixels + x1 * 4;
+			const unsigned char *in2 = source->pixels + x2 * 4;
 
-			xx = ((x * source->width + source->width / 2) / width);
-			x1 = (((x - 1) * source->width + source->width / 2) / width); if (x1 < 0) x1 = 0;
-			x2 = (((x + 1) * source->width + source->width / 2) / width); if (x1 > source->width - 1) x1 = source->width - 1;
-
-			colour[0] = 0;
-			colour[1] = 0;
-			colour[2] = 0;
-			colour[3] = 0;
-			num = 0;
-
-			for (j = y1; j <= y2; j++)
-			{
-				const unsigned char *in = source->pixels + j * source->width * 4;
-				int dist;
-				int jdist;
-				
-				if (j < yy)
-					jdist = (yy - y1) - (yy - j);
-				else if (j > yy)
-					jdist = (y2 - yy) - (j - yy);
-				else
-					jdist = max(y2 - yy, yy - y1);
-
-				for (i = x1; i <= x2; i++)
-				{
-					int idist;
-
-					if (i < xx)
-						idist = (xx - x1) - (xx - i);
-					else if (i > xx)
-						idist = (x2 - xx) - (i - xx);
-					else
-						idist = max(x2 - xx, xx - x1);
-
-					dist = idist * jdist;
-
-					colour[0] += dist * in[i*4+0];
-					colour[1] += dist * in[i*4+1];
-					colour[2] += dist * in[i*4+2];
-					colour[3] += dist * in[i*4+3];
-					num += dist;
-				}
-			}
-
-			if (num > 0) /* i think this value is 0 if the new width is the same or more than the old width? */
-			{
-				out[x*4+0] = colour[0] / num;
-				out[x*4+1] = colour[1] / num;
-				out[x*4+2] = colour[2] / num;
-				out[x*4+3] = colour[3] / num;
-			}
-			else
-			{
-				out[x*4+0] = out[x*4+1] = out[x*4+2] = out[x*4+3] = 0;
-			}
+			for (y = 0; y < source->height; y++, out += newwidth * 4, in1 += source->width * 4, in2 += source->width * 4)
+				for (i = 0; i < 4; i++)
+					out[i] = (in1[i] * ifx1 + in2[i] * ifx2 + 127) >> 8;
 		}
 	}
+	else if (newwidth < source->width)
+	{
+		for (y = 0; y < source->height; y++)
+		for (x = 0; x < newwidth; x++)
+		{
+			const unsigned char *in = source->pixels + y * source->width * 4;
+			float colour[4], count;
+			float fxx = (x * source->width) / (float)newwidth;
+			int x1 = ((x - 1) * source->width + newwidth / 2) / newwidth;
+			int x2 = ((x + 1) * source->width + newwidth / 2) / newwidth;
+
+			x1 = max(x1, 0);
+			x2 = min(x2, source->width - 1);
+
+			colour[0] = colour[1] = colour[2] = colour[3] = 0;
+			count = 0;
+
+			for (i = x1; i <= x2; i++)
+			{
+				float dist;
+
+				if (i < fxx)
+					dist = (fxx - x1) - (fxx - i);
+				else if (i > fxx)
+					dist = (x2 - fxx) - (i - fxx);
+				else
+					dist = max(x2 - fxx, fxx - x1);
+
+				dist *= dist; /* square it to increase sharpness a little */
+
+				colour[0] += dist * in[i*4+0];
+				colour[1] += dist * in[i*4+1];
+				colour[2] += dist * in[i*4+2];
+				colour[3] += dist * in[i*4+3];
+				count += dist;
+			}
+
+			if (!count)
+				count = 1; /* i don't THINK this should happen... */
+
+			for (i = 0; i < 4; i++)
+				intermediate->pixels[(y*newwidth+x)*4+i] = (unsigned char)(colour[i] / count);
+		}
+	}
+	else
+	{
+		memcpy(intermediate->pixels, source->pixels, source->width * source->height * 4);
+	}
+
+/* vertical resize */
+	if (newheight > source->height)
+	{
+		for (y = 0; y < newheight; y++)
+		{
+			float fy = (float)y * (float)source->height / (float)newheight;
+			int y1 = (int)fy;
+			int y2 = min(y1 + 1, source->height - 1);
+			float fy2 = fy - (float)y1;
+			float fy1 = 1.0f - fy2;
+			int ify1 = (int)(fy1 * 256.0f);
+			int ify2 = (int)(fy2 * 256.0f);
+			unsigned char *out = image->pixels + y * newwidth * 4;
+			const unsigned char *in1 = intermediate->pixels + y1 * newwidth * 4;
+			const unsigned char *in2 = intermediate->pixels + y2 * newwidth * 4;
+
+			for (x = 0; x < newwidth; x++, out += 4, in1 += 4, in2 += 4)
+				for (i = 0; i < 4; i++)
+					out[i] = (in1[i] * ify1 + in2[i] * ify2 + 127) >> 8;
+		}
+	}
+	else if (newheight < source->height)
+	{
+		for (y = 0; y < newheight; y++)
+		for (x = 0; x < newwidth; x++)
+		{
+			float colour[4], count;
+			float fyy = (y * source->height) / (float)newheight;
+			int y1 = ((y - 1) * source->height + newheight / 2) / newheight;
+			int y2 = ((y + 1) * source->height + newheight / 2) / newheight;
+
+			y1 = max(y1, 0);
+			y2 = min(y2, source->height - 1);
+
+			colour[0] = colour[1] = colour[2] = colour[3] = 0;
+			count = 0;
+
+			for (i = y1; i <= y2; i++)
+			{
+				const unsigned char *in = intermediate->pixels + (i * newwidth + x) * 4;
+				float dist;
+
+				if (i < fyy)
+					dist = (fyy - y1) - (fyy - i);
+				else if (i > fyy)
+					dist = (y2 - fyy) - (i - fyy);
+				else
+					dist = max(y2 - fyy, fyy - y1);
+
+				dist *= dist; /* square it to increase sharpness a little */
+
+				colour[0] += dist * in[0];
+				colour[1] += dist * in[1];
+				colour[2] += dist * in[2];
+				colour[3] += dist * in[3];
+				count += dist;
+			}
+
+			if (!count)
+				count = 1; /* i don't THINK this should happen... */
+
+			for (i = 0; i < 4; i++)
+				image->pixels[(y*newwidth+x)*4+i] = (unsigned char)(colour[i] / count);
+		}
+	}
+	else
+	{
+		memcpy(image->pixels, intermediate->pixels, newwidth * newheight * 4);
+	}
+
+	image_free(&intermediate);
 
 	return image;
 }
