@@ -122,6 +122,7 @@ typedef struct model_s
 
 	int flags; /* quake only */
 	int synctype; /* quake only, possible values: 0 (sync), 1 (rand) */
+	float offsets[3]; /* quake only, unused but i'm including it for completeness */
 } model_t;
 
 void mesh_initialize(model_t *model, mesh_t *mesh);

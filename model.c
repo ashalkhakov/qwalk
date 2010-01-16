@@ -253,6 +253,8 @@ static model_t *model_clone_except_meshes(const model_t *model)
 
 	newmodel->flags = model->flags;
 	newmodel->synctype = model->synctype;
+	for (i = 0; i < 3; i++)
+		newmodel->offsets[i] = model->offsets[i];
 
 	return newmodel;
 }

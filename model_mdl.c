@@ -450,6 +450,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	model.flags = header->flags;
 	model.synctype = header->synctype;
+	model.offsets[0] = header->offsets[0];
+	model.offsets[1] = header->offsets[1];
+	model.offsets[2] = header->offsets[2];
 
 	mesh = &model.meshes[0];
 	mesh_initialize(&model, mesh);
@@ -673,9 +676,9 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->origin[1] = mins[1];
 	header->origin[2] = mins[2];
 	header->radius = (float)sqrt(dist[0]*dist[0] + dist[1]*dist[1] + dist[2]*dist[2]);
-	header->offsets[0] = 0; /* FIXME */
-	header->offsets[1] = 0; /* FIXME */
-	header->offsets[2] = 0; /* FIXME */
+	header->offsets[0] = model->offsets[0];
+	header->offsets[1] = model->offsets[1];
+	header->offsets[2] = model->offsets[2];
 	header->numskins = model->num_skins;
 	header->skinwidth = (skinwidth + 3) & ~3; /* the skin width must be padded up to a multiple of 4 */
 	header->skinheight = skinheight;

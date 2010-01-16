@@ -34,3 +34,4 @@ Features: import mdl, md2, or md3; export mdl.
 - Modes to emulate certain engines' rendering exactly, including lighting,
   texture coordinate rounding, and crappy GLQuake texture resampling.
 - Optional stencil shadows mode.
+- Rewrite command-line argument parsing.

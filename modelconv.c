@@ -32,6 +32,7 @@ static int texheight = -1;
 
 static int flags = 0;
 static int synctype = 0;
+static float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
 
 static model_t *model = NULL;
 
@@ -325,6 +326,36 @@ int main(int argc, char **argv)
 					return 0;
 				}
 			}
+			else if (!strcmp(argv[i], "-offsets_x"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-offsets_x'\n", argv[0]);
+					return 0;
+				}
+
+				offsets_x = (float)atof(argv[i]);
+			}
+			else if (!strcmp(argv[i], "-offsets_y"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-offsets_y'\n", argv[0]);
+					return 0;
+				}
+
+				offsets_y = (float)atof(argv[i]);
+			}
+			else if (!strcmp(argv[i], "-offsets_z"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-offsets_z'\n", argv[0]);
+					return 0;
+				}
+
+				offsets_z = (float)atof(argv[i]);
+			}
 			else
 			{
 				printf("%s: unrecognized option '%s'\n", argv[0], argv[i]);
@@ -349,6 +380,9 @@ int main(int argc, char **argv)
 
 	model->flags = flags;
 	model->synctype = synctype;
+	model->offsets[0] = offsets_x;
+	model->offsets[1] = offsets_y;
+	model->offsets[2] = offsets_z;
 
 	if (texfilename[0])
 	{
