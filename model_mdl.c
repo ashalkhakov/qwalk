@@ -579,8 +579,6 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	return true;
 }
 
-/* FIXME - should refuse to save a skin with a width that's not a multiple of 4, because that will kill alignment
- * on all later data. offer an easy solution (automatic?) to pad the right side with pixels. */
 bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 {
 	void *data;
@@ -675,7 +673,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offsets[1] = 0; /* FIXME */
 	header->offsets[2] = 0; /* FIXME */
 	header->numskins = model->num_skins;
-	header->skinwidth = skinwidth;
+	header->skinwidth = (skinwidth + 3) & ~3; /* the skin width must be padded up to a multiple of 4 */
 	header->skinheight = skinheight;
 	header->numverts = mesh->num_vertices;
 	header->numtris = mesh->num_triangles;
@@ -718,10 +716,20 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 			skintype->type = ALIAS_SKIN_SINGLE;
 		}
 
+	/* write the skin images, padding the width up to a multiple of 4 */
 		for (j = 0; j < skininfo->num_skins; j++)
 		{
-			memcpy(f, skinimages[skininfo->skins[j].offset]->pixels, header->skinwidth * header->skinheight);
-			f += header->skinwidth * header->skinheight;
+			const image_paletted_t *image = skinimages[skininfo->skins[j].offset];
+			int x, y;
+
+			for (y = 0; y < image->height; y++)
+			{
+				memcpy(f, image->pixels + y * image->width, image->width);
+				f += image->width;
+
+				for (x = image->width; x < header->skinwidth; x++)
+					*f++ = image->pixels[y * image->width + image->width - 1];
+			}
 		}
 	}
 
@@ -731,8 +739,8 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		stvert_t *stvert = (stvert_t*)f;
 
 		stvert->onseam = 0;
-		stvert->s = (int)(mesh->texcoord2f[i*2+0] * header->skinwidth);
-		stvert->t = (int)(mesh->texcoord2f[i*2+1] * header->skinheight);
+		stvert->s = (int)(mesh->texcoord2f[i*2+0] * skinwidth); /* use the real skinwidth, not the padded header->skinwidth */
+		stvert->t = (int)(mesh->texcoord2f[i*2+1] * skinheight);
 
 		f += sizeof(stvert_t);
 	}

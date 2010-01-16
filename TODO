@@ -1,23 +1,28 @@
 
+ +---------------------------+
+ | Roadmap for first release |
+ +---------------------------+
+
+Features: import mdl, md2, or md3; export mdl.
+
+- Merge meshes with different textures.
+- When exporting MD2, merge all vertices with the same normal but different
+  texcoords, since texcoords are stored per-triangle.
+- Fix the image resize function to work when scaling up.
+- Fix byte swapping.
+
  +----+
  |TODO|
  +----+
 
-- Test the PCX importer with "troublesome" PCX files.
-- Merge meshes with different textures.
 - Keep compressed MDL vertex coordinates, indices, etc. intact in the case of
   importing, processing & exporting an MDL (don't want any "drift", and don't
   want the vertices unnecessarily split up).
-- When exporting MDL/MD2, merge all vertices with the same normal but different
-  texcoords, since texcoords are stored per-triangle.
-- MDLs with a skin width not multiple of 4 should be padded.
 - Command for drawing wireframe lines on the skin.
-- Fix the image resize function to work when scaling up.
 - Allow importing alternate palettes for MDLs.
 - Allow configuration of the fullbright rules when downsampling to the palette
   when exporting MDLs. Possibly just import the colormap, and tell it to ignore
   fullbrights.
-- Write an MD2 writer.
 - Generate MD2 glcmds.
 - Write an MD3 writer.
 - Do air-tight error checking to avoid all potential crashes (and detect all
