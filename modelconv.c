@@ -353,7 +353,10 @@ int main(int argc, char **argv)
 	if (texfilename[0])
 	{
 		if (!replacetexture(texfilename))
-			return 0;
+		{
+			model_free(model);
+			return 1;
+		}
 	}
 
 	if (texwidth > 0 || texheight > 0)
