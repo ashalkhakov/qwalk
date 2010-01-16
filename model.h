@@ -55,7 +55,7 @@ typedef struct tag_s
 {
 	char *name;
 
-	mat4x4f_t *matrix;
+	mat4x4f_t *matrix; /* [model.total_frames] */
 } tag_t;
 
 typedef enum skintype_e
@@ -144,6 +144,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size);
 bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size);
 
-mesh_t *model_merge_meshes(model_t *model);
+model_t *model_clone(const model_t *model);
+
+model_t *model_merge_meshes(const model_t *model);
 
 #endif

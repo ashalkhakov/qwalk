@@ -382,16 +382,20 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	unsigned char *data;
 	int skinwidth, skinheight;
 	char **skinfilenames;
+	model_t *newmodel;
 	const mesh_t *mesh;
 	md2_header_t *header;
 	int offset;
 	int i, j, k;
 
-	if (model->num_meshes != 1)
+	if (model->num_meshes == 1)
 	{
-	/* FIXME - create a function to combine meshes so that this can be done */
-		printf("model_md2_save: model must have only one mesh\n");
-		return false;
+		newmodel = NULL;
+	}
+	else
+	{
+		newmodel = model_merge_meshes(model);
+		model = newmodel;
 	}
 
 	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
@@ -563,6 +567,9 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	for (i = 0; i < model->num_skins; i++)
 		qfree(skinfilenames[i]);
 	qfree(skinfilenames);
+
+	if (newmodel)
+		model_free(newmodel);
 
 	swap_md2(data, offset);
 	*out_data = data;

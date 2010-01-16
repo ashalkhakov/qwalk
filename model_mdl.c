@@ -583,6 +583,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 {
 	void *data;
 	unsigned char *f;
+	model_t *newmodel;
 	const mesh_t *mesh;
 	float mins[3], maxs[3], dist[3], totalsize;
 	mdl_header_t *header;
@@ -590,11 +591,14 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	int skinwidth, skinheight;
 	image_paletted_t **skinimages;
 
-	if (model->num_meshes != 1)
+	if (model->num_meshes == 1)
 	{
-	/* FIXME - combine the meshes temporarily */
-		printf("model_mdl_save: model must have only one mesh\n");
-		return false;
+		newmodel = NULL;
+	}
+	else
+	{
+		newmodel = model_merge_meshes(model);
+		model = newmodel;
 	}
 
 	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
@@ -878,6 +882,9 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	for (i = 0; i < model->total_skins; i++)
 		qfree(skinimages[i]);
 	qfree(skinimages);
+
+	if (newmodel)
+		model_free(newmodel);
 
 	swap_mdl(data, f - (unsigned char*)data);
 	*out_data = data;

@@ -216,7 +216,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 /* byteswap header */
 	swap_md3(filedata, filesize);
 
-	printf("header numskins: %d\n", header->num_skins);
+/*	printf("header numskins: %d\n", header->num_skins);*/
 
 /* read skins */
 	model.total_skins = 1;
@@ -297,7 +297,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		mesh_t *mesh = &model.meshes[i];
 		md3_vertex_t *md3_vertex;
 
-		printf("mesh %d: \"%s\"\n", i, md3_mesh->name);
+/*		printf("mesh %d: \"%s\"\n", i, md3_mesh->name);*/
 
 		mesh_initialize(&model, mesh);
 
@@ -340,7 +340,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		{
 			md3_shader_t *md3_shader = (md3_shader_t*)(f + md3_mesh->lump_shaders) + j;
 
-			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);
+/*			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);*/
 		}
 
 	/* load skin */

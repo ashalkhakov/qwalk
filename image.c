@@ -88,6 +88,9 @@ image_rgba_t *image_clone(const image_rgba_t *source)
 {
 	image_rgba_t *image;
 
+	if (!source)
+		return NULL;
+
 	image = image_alloc(source->width, source->height);
 	if (!image)
 		return NULL;

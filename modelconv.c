@@ -236,8 +236,7 @@ void dump_txt(const char *filename, const model_t *model)
 
 int main(int argc, char **argv)
 {
-	int i, j;
-	mesh_t *mesh;
+	int i, j, k;
 
 	set_atexit_final_event(dumpleaks);
 	atexit(call_atexit_events);
@@ -357,19 +356,22 @@ int main(int argc, char **argv)
 			return 0;
 	}
 
-	mesh = model_merge_meshes(model);
-
 	if (texwidth > 0 || texheight > 0)
 	{
-		for (i = 0; i < model->total_skins; i++)
+		mesh_t *mesh;
+
+		for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 		{
-			for (j = 0; j < SKIN_NUMTYPES; j++)
+			for (j = 0; j < model->total_skins; j++)
 			{
-				if (mesh->textures[i].components[j])
+				for (k = 0; k < SKIN_NUMTYPES; k++)
 				{
-					image_rgba_t *oldimage = mesh->textures[i].components[j];
-					mesh->textures[i].components[j] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
-					image_free(&oldimage);
+					if (mesh->textures[j].components[j])
+					{
+						image_rgba_t *oldimage = mesh->textures[j].components[k];
+						mesh->textures[j].components[k] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
+						image_free(&oldimage);
+					}
 				}
 			}
 		}
