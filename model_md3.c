@@ -343,11 +343,11 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);
 		}*/
 
-	/* load skin - for now, just load a black 32x32 texture */
+	/* load skin - for now, just load a light grey 32x32 texture */
 		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
 		for (j = 0; j < SKIN_NUMTYPES; j++)
 			mesh->textures[0].components[j] = NULL;
-		mesh->textures[0].components[SKIN_DIFFUSE] = image_createfill(32, 32, 0, 0, 0, 255);
+		mesh->textures[0].components[SKIN_DIFFUSE] = image_createfill(32, 32, 192, 192, 192, 255);
 
 		f += md3_mesh->lump_end;
 	}
