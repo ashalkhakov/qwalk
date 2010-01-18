@@ -621,6 +621,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		{
 			int offset = skininfo->skins[j].offset;
 
+		/* FIXME - theoretically a skin can have all NULL components, which means image_palettize will also return NULL */
 			skinimages[offset] = image_palettize(&quakepalette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
 
 			skinwidth = skinimages[offset]->width;

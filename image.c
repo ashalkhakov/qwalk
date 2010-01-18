@@ -128,6 +128,9 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 	image_paletted_t *pimage;
 	int i;
 
+	if (!source_diffuse && !source_fullbright)
+		return NULL;
+
 	pimage = (image_paletted_t*)qmalloc(sizeof(image_paletted_t) + source_diffuse->width * source_diffuse->height);
 	if (!pimage)
 		return NULL;
@@ -141,7 +144,7 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 		if (palette->fullbright_flags[i])
 			palette_has_fullbrights = true;
 
-	if (source_diffuse && source_diffuse->pixels && source_fullbright && source_fullbright->pixels)
+	if (source_diffuse && source_fullbright)
 	{
 		const unsigned char *in_diffuse = source_diffuse->pixels;
 		const unsigned char *in_fullbright = source_fullbright->pixels;
@@ -154,23 +157,19 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 				*out = palettize_colour(palette, false, in_diffuse);
 		}
 	}
-	else if (source_diffuse && source_diffuse->pixels)
+	else if (source_diffuse)
 	{
 		const unsigned char *in_diffuse = source_diffuse->pixels;
 		unsigned char *out = pimage->pixels;
 		for (i = 0; i < pimage->width * pimage->height; i++, in_diffuse += 4, out++)
 			*out = palettize_colour(palette, false, in_diffuse);
 	}
-	else if (source_fullbright && source_fullbright->pixels)
+	else if (source_fullbright)
 	{
 		const unsigned char *in_fullbright = source_fullbright->pixels;
 		unsigned char *out = pimage->pixels;
 		for (i = 0; i < pimage->width * pimage->height; i++, in_fullbright += 4, out++)
 			*out = palettize_colour(palette, palette_has_fullbrights, in_fullbright);
-	}
-	else
-	{
-		memset(pimage->pixels, 0, pimage->width * pimage->height);
 	}
 
 	return pimage;
