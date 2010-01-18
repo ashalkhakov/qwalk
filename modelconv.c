@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 			{
 				for (k = 0; k < SKIN_NUMTYPES; k++)
 				{
-					if (mesh->textures[j].components[j])
+					if (mesh->textures[j].components[k])
 					{
 						image_rgba_t *oldimage = mesh->textures[j].components[k];
 						mesh->textures[j].components[k] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
