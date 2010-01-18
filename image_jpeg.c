@@ -451,9 +451,8 @@ static bool_t jpeg_openlibrary(void)
 	if (!loadlibrary("libjpeg.62.dylib", &jpegdll, jpegfuncs))
 		return false;
 #else
-	if (!loadlibrary("libjpeg.so.62", &jpegdll, jpegfuncs))
-		return false;
-	if (!loadlibrary("libjpeg.so", &jpegdll, jpegfuncs))
+	if (!loadlibrary("libjpeg.so.62", &jpegdll, jpegfuncs) &&
+	    !loadlibrary("libjpeg.so", &jpegdll, jpegfuncs))
 		return false;
 #endif
 

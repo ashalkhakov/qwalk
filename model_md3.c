@@ -336,12 +336,12 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 
 	/* load shaders */
-		for (j = 0; j < md3_mesh->num_shaders; j++)
+/*		for (j = 0; j < md3_mesh->num_shaders; j++)
 		{
 			md3_shader_t *md3_shader = (md3_shader_t*)(f + md3_mesh->lump_shaders) + j;
 
-/*			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);*/
-		}
+			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);
+		}*/
 
 	/* load skin */
 		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));

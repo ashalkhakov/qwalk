@@ -170,7 +170,7 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 	}
 	else
 	{
-		memcpy(pimage->pixels, 0, pimage->width * pimage->height);
+		memset(pimage->pixels, 0, pimage->width * pimage->height);
 	}
 
 	return pimage;

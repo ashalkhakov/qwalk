@@ -916,11 +916,23 @@ int main(int argc, char **argv)
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK) < 0)
 	{
 		fprintf(stderr, "SDL failed to initialize: %s\n", SDL_GetError());
+		qfree(r_state.vertex3f);
+		qfree(r_state.normal3f);
+		qfree(r_state.colour4ub);
+		qfree(r_state.plane4f);
+		model_free(model);
 		return 1;
 	}
 
 	if (!setvideomode(width, height, bpp, false))
+	{
+		qfree(r_state.vertex3f);
+		qfree(r_state.normal3f);
+		qfree(r_state.colour4ub);
+		qfree(r_state.plane4f);
+		model_free(model);
 		return 1;
+	}
 
 	for (done = false; !done; )
 	{
