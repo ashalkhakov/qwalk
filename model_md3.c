@@ -219,14 +219,9 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 /*	printf("header numskins: %d\n", header->num_skins);*/
 
 /* read skins */
-	model.total_skins = 1;
-	model.num_skins = 1;
-	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
-	model.skininfo[0].frametime = 0.1f;
-	model.skininfo[0].num_skins = 1;
-	model.skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-	model.skininfo[0].skins[0].name = copystring("skin");
-	model.skininfo[0].skins[0].offset = 0;
+	model.total_skins = 0;
+	model.num_skins = 0;
+	model.skininfo = NULL;
 
 /* read frames */
 	model.total_frames = header->num_frames;
@@ -343,17 +338,17 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 			printf(" - shader %d: \"%s\"\n", j, md3_shader->name);
 		}*/
 
-	/* load skin - for now, just load a light grey 32x32 texture */
-		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
-		for (j = 0; j < SKIN_NUMTYPES; j++)
-			mesh->textures[0].components[j] = NULL;
-		mesh->textures[0].components[SKIN_DIFFUSE] = image_createfill(32, 32, 192, 192, 192, 255);
+	/* load skin */
+		mesh->textures = NULL;
 
 		f += md3_mesh->lump_end;
 	}
 
 	model.flags = header->flags;
 	model.synctype = 0;
+	model.offsets[0] = 0.0f;
+	model.offsets[1] = 0.0f;
+	model.offsets[2] = 0.0f;
 
 	*out_model = model;
 	return true;

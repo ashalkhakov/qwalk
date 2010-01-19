@@ -33,6 +33,9 @@ extern void loadfont(void);
 extern void freefont(void);
 extern void drawstringf(int x, int y, const char *s, ...);
 
+int texwidth = -1; /* unused by viewer but needed by model_md2.c */
+int texheight = -1;
+
 int vid_width = -1;
 int vid_height = -1;
 
@@ -535,9 +538,22 @@ void render(void)
 	{
 		const mesh_t *mesh = &model->meshes[i];
 
-		const skininfo_t *skininfo = &model->skininfo[g_skin];
-		int sframe = (int)(anim_progress / skininfo->frametime) % skininfo->num_skins;
-		int skinoffset = skininfo->skins[sframe].offset;
+		unsigned int diffuse_handle = 0;
+		unsigned int fullbright_handle = 0;
+		const float *diffuse_texcoord2f = NULL;
+		const float *fullbright_texcoord2f = NULL;
+
+		if (g_skin >= 0 && g_skin < model->num_skins)
+		{
+			const skininfo_t *skininfo = &model->skininfo[g_skin];
+			int sframe = (int)(anim_progress / skininfo->frametime) % skininfo->num_skins;
+			int skinoffset = skininfo->skins[sframe].offset;
+
+			diffuse_handle = mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].handle;
+			fullbright_handle = mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].handle;
+			diffuse_texcoord2f = mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].texcoord2f;
+			fullbright_texcoord2f = mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].texcoord2f;
+		}
 
 		animate_mesh(mesh);
 
@@ -548,13 +564,13 @@ void render(void)
 		glVertexPointer(3, GL_FLOAT, sizeof(float[3]), r_state.vertex3f); CHECKGLERROR();
 
 	/* draw diffuse pass */
-		if (mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].handle && !wireframe)
+		if (diffuse_handle && diffuse_texcoord2f && !wireframe)
 		{
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, diffuse_handle); CHECKGLERROR();
 
 			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
-			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].texcoord2f); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), diffuse_texcoord2f); CHECKGLERROR();
 		}
 		else
 		{
@@ -573,23 +589,23 @@ void render(void)
 		{
 			glDisableClientState(GL_COLOR_ARRAY); CHECKGLERROR();
 		}
-		if (mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].handle && !wireframe)
+		if (diffuse_handle && diffuse_texcoord2f && !wireframe)
 		{
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
 		}
 
 	/* draw fullbright pass (who needs multitexture!) */
-		if (mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].handle && !wireframe)
+		if (fullbright_handle && fullbright_texcoord2f && !wireframe)
 		{
 			glDepthFunc(GL_LEQUAL); CHECKGLERROR();
 			glBlendFunc(GL_ONE, GL_ONE); CHECKGLERROR();
 			glEnable(GL_BLEND); CHECKGLERROR();
 
 			glEnable(GL_TEXTURE_2D); CHECKGLERROR();
-			glBindTexture(GL_TEXTURE_2D, mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].handle); CHECKGLERROR();
+			glBindTexture(GL_TEXTURE_2D, fullbright_handle); CHECKGLERROR();
 
 			glEnableClientState(GL_TEXTURE_COORD_ARRAY); CHECKGLERROR();
-			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].texcoord2f); CHECKGLERROR();
+			glTexCoordPointer(2, GL_FLOAT, sizeof(float[2]), fullbright_texcoord2f); CHECKGLERROR();
 
 			glDrawElements(GL_TRIANGLES, mesh->num_triangles * 3, GL_UNSIGNED_INT, mesh->triangle3i); CHECKGLERROR();
 
@@ -699,7 +715,7 @@ bool_t replacetexture(const char *filename)
 	size_t filesize;
 	char *error;
 	image_rgba_t *image;
-	int i, j, k;
+	int i;
 	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
@@ -720,15 +736,24 @@ bool_t replacetexture(const char *filename)
 
 	qfree(filedata);
 
+/* clear old skins */
+	model_clear_skins(model);
+
+/* add new skin */
+	model->total_skins = 1;
+	model->num_skins = 1;
+	model->skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t));
+	model->skininfo[0].frametime = 0.1f;
+	model->skininfo[0].num_skins = 1;
+	model->skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(singleframe_t));
+	model->skininfo[0].skins[0].name = copystring(filename);
+	model->skininfo[0].skins[0].offset = 0;
+
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		for (j = 0; j < model->total_skins; j++)
-		{
-			for (k = 0; k < SKIN_NUMTYPES; k++)
-				image_free(&mesh->textures[j].components[k]); /* also sets image to NULL */
-
-			mesh->textures[j].components[SKIN_DIFFUSE] = image_clone(image);
-		}
+		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
+		mesh->textures[0].components[SKIN_DIFFUSE] = image_clone(image);
+		mesh->textures[0].components[SKIN_FULLBRIGHT] = NULL;
 	}
 
 	image_free(&image);

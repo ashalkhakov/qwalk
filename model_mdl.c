@@ -582,11 +582,11 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	return true;
 }
 
-bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
+bool_t model_mdl_save(const model_t *orig_model, void **out_data, size_t *out_size)
 {
 	void *data;
 	unsigned char *f;
-	model_t *newmodel;
+	model_t *model;
 	const mesh_t *mesh;
 	float mins[3], maxs[3], dist[3], totalsize;
 	mdl_header_t *header;
@@ -594,23 +594,54 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 	int skinwidth, skinheight;
 	image_paletted_t **skinimages;
 
-	if (model->num_meshes == 1)
-	{
-		newmodel = NULL;
-	}
-	else
-	{
-		newmodel = model_merge_meshes(model);
-		model = newmodel;
-	}
-
-	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
+	model = model_merge_meshes(orig_model);
 
 	mesh = &model->meshes[0];
 
-/* create 8-bit textures */
 	skinwidth = 0;
 	skinheight = 0;
+	for (i = 0; i < model->num_skins; i++)
+	{
+		const skininfo_t *skininfo = &model->skininfo[i];
+
+		for (j = 0; j < skininfo->num_skins; j++)
+		{
+			int offset = skininfo->skins[j].offset;
+
+			if (!mesh->textures[offset].components[SKIN_DIFFUSE])
+			{
+				printf("Model has missing skin.\n");
+				model_free(model);
+				return false;
+			}
+
+			if (skinwidth && skinheight && (skinwidth != mesh->textures[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->textures[offset].components[SKIN_DIFFUSE]->height))
+			{
+				printf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size.\n");
+				model_free(model);
+				return false;
+			}
+			skinwidth = mesh->textures[offset].components[SKIN_DIFFUSE]->width;
+			skinheight = mesh->textures[offset].components[SKIN_DIFFUSE]->height;
+
+		/* if fullbright texture is a different size, resample it to match the diffuse texture */
+			if (mesh->textures[offset].components[SKIN_FULLBRIGHT] && (mesh->textures[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->textures[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
+			{
+				image_rgba_t *image = image_resize(mesh->textures[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_free(&mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+				mesh->textures[offset].components[SKIN_FULLBRIGHT] = image;
+			}
+		}
+	}
+
+	if (!skinwidth || !skinheight)
+	{
+		printf("Model has no skin. Use -tex to import a skin.\n");
+		model_free(model);
+		return false;
+	}
+
+/* create 8-bit textures */
 	skinimages = (image_paletted_t**)qmalloc(sizeof(image_paletted_t*) * model->total_skins);
 
 	for (i = 0; i < model->num_skins; i++)
@@ -621,11 +652,7 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		{
 			int offset = skininfo->skins[j].offset;
 
-		/* FIXME - theoretically a skin can have all NULL components, which means image_palettize will also return NULL */
 			skinimages[offset] = image_palettize(&quakepalette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
-
-			skinwidth = skinimages[offset]->width;
-			skinheight = skinimages[offset]->height;
 		}
 	}
 
@@ -887,9 +914,6 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 		qfree(skinimages[i]);
 	qfree(skinimages);
 
-	if (newmodel)
-		model_free(newmodel);
-
 	swap_mdl(data, f - (unsigned char*)data);
 	*out_data = data;
 	*out_size = f - (unsigned char*)data;
@@ -931,6 +955,8 @@ bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size)
 
 	if (!i)
 		printf("This model should run fine in all engines.\n");
+
+	model_free(model);
 
 	return true;
 }

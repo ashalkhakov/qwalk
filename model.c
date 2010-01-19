@@ -162,6 +162,34 @@ void model_free(model_t *model)
 	qfree(model);
 }
 
+void model_clear_skins(model_t *model)
+{
+	int i, j, k;
+	mesh_t *mesh;
+
+	for (i = 0; i < model->num_skins; i++)
+	{
+		for (j = 0; j < model->skininfo[i].num_skins; j++)
+			qfree(model->skininfo[i].skins[j].name);
+		qfree(model->skininfo[i].skins);
+	}
+	qfree(model->skininfo);
+
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
+	{
+		for (j = 0; j < model->total_skins; j++)
+			for (k = 0; k < SKIN_NUMTYPES; k++)
+				image_free(&mesh->textures[j].components[k]);
+		qfree(mesh->textures);
+
+		mesh->textures = NULL;
+	}
+
+	model->total_skins = 0;
+	model->num_skins = 0;
+	model->skininfo = NULL;
+}
+
 bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 /* FIXME - check the file header, not the filename extension */

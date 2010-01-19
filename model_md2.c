@@ -22,6 +22,8 @@
 #include "global.h"
 #include "model.h"
 
+extern int texwidth, texheight;
+
 extern const float anorms[162][3];
 int compress_normal(const float *normal);
 
@@ -221,33 +223,17 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	dtriangles = (dtriangle_t*)(f + header->offset_tris);
 
 /* stuff */
-	if (header->num_skins > 0)
-	{
-		model.total_skins = header->num_skins;
-		model.num_skins = header->num_skins;
-		model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+	model.total_skins = header->num_skins;
+	model.num_skins = header->num_skins;
+	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
 
-		for (i = 0; i < model.num_skins; i++)
-		{
-			model.skininfo[i].frametime = 0.1f;
-			model.skininfo[i].num_skins = 1;
-			model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-			model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
-			model.skininfo[i].skins[0].offset = i;
-		}
-	}
-	else
+	for (i = 0; i < model.num_skins; i++)
 	{
-	/* quake2 player models don't reference any skins inside the model, so create a blank one */
-		model.total_skins = 1;
-		model.num_skins = 1;
-		model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t));
-
-		model.skininfo[0].frametime = 0.1f;
-		model.skininfo[0].num_skins = 1;
-		model.skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-		model.skininfo[0].skins[0].name = copystring("skin");
-		model.skininfo[0].skins[0].offset = 0;
+		model.skininfo[i].frametime = 0.1f;
+		model.skininfo[i].num_skins = 1;
+		model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+		model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
+		model.skininfo[i].skins[0].offset = i;
 	}
 
 	model.total_frames = header->num_frames;
@@ -273,6 +259,9 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	model.flags = 0;
 	model.synctype = 0;
+	model.offsets[0] = 0.0f;
+	model.offsets[1] = 0.0f;
+	model.offsets[2] = 0.0f;
 
 	mesh = &model.meshes[0];
 	mesh_initialize(&model, mesh);
@@ -282,42 +271,33 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.num_skins);
 	for (i = 0; i < model.num_skins; i++)
 	{
+		void *filedata;
+		size_t filesize;
+		char *error;
 		image_rgba_t *image;
 
 		for (j = 0; j < SKIN_NUMTYPES; j++)
 			mesh->textures[i].components[j] = NULL;
 
-		if (header->num_skins > 0)
+	/* try to load the image file mentioned in the md2 */
+	/* if any of the skins fail to load, they will be left as null */
+		if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
 		{
-			void *filedata;
-			size_t filesize;
-			char *error;
+			printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
+			qfree(error);
+			continue;
+		}
 
-		/* try to load the image file mentioned in the md2 */
-		/* if any of the skins fail to load, they will be left as null */
-			if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
-			{
-				printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
-				qfree(error);
-				continue;
-			}
-
-			image = image_load(md2skins[i].name, filedata, filesize, &error);
-			if (!image)
-			{
-				printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
-				qfree(error);
-				qfree(filedata);
-				continue;
-			}
-
+		image = image_load(md2skins[i].name, filedata, filesize, &error);
+		if (!image)
+		{
+			printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
+			qfree(error);
 			qfree(filedata);
+			continue;
 		}
-		else
-		{
-		/* quake2 player models don't reference any skins inside the model, so create a blank one */
-			image = image_createfill(header->skinwidth, header->skinheight, 192, 192, 192, 255);
-		}
+
+		qfree(filedata);
 
 		mesh->textures[i].components[SKIN_DIFFUSE] = image;
 	}
@@ -776,39 +756,70 @@ static void md2_build_glcmds(const dstvert_t *texcoords, int skinwidth, int skin
 	qfree(used);
 }
 
-bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
+bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_size)
 {
 	char *error;
 	unsigned char *data;
 	int skinwidth, skinheight;
 	char **skinfilenames;
-	model_t *newmodel;
+	model_t *model;
 	const mesh_t *mesh;
 	md2_data_t *md2data;
 	md2_header_t *header;
 	int offset;
 	int i, j, k;
 
-	if (model->num_meshes == 1)
-	{
-		newmodel = NULL;
-	}
-	else
-	{
-		newmodel = model_merge_meshes(model);
-		model = newmodel;
-	}
-
-	/* FIXME - resample fullbright skin to match diffuse skin size, and resample all skins to be the same size */
+	model = model_merge_meshes(orig_model);
 
 	mesh = &model->meshes[0];
+
+	skinwidth = (texwidth != -1) ? texwidth : 0;
+	skinheight = (texheight != -1) ? texheight : 0;
+	for (i = 0; i < model->num_skins; i++)
+	{
+		const skininfo_t *skininfo = &model->skininfo[i];
+
+		for (j = 0; j < skininfo->num_skins; j++)
+		{
+			int offset = skininfo->skins[j].offset;
+
+			if (!mesh->textures[offset].components[SKIN_DIFFUSE])
+			{
+				printf("Model has missing skin.\n");
+				model_free(model);
+				return false;
+			}
+
+			if (skinwidth && skinheight && (skinwidth != mesh->textures[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->textures[offset].components[SKIN_DIFFUSE]->height))
+			{
+				printf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size.\n");
+				model_free(model);
+				return false;
+			}
+			skinwidth = mesh->textures[offset].components[SKIN_DIFFUSE]->width;
+			skinheight = mesh->textures[offset].components[SKIN_DIFFUSE]->height;
+
+		/* if fullbright texture is a different size, resample it to match the diffuse texture */
+			if (mesh->textures[offset].components[SKIN_FULLBRIGHT] && (mesh->textures[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->textures[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
+			{
+				image_rgba_t *image = image_resize(mesh->textures[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_free(&mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+				mesh->textures[offset].components[SKIN_FULLBRIGHT] = image;
+			}
+		}
+	}
+
+	if (!skinwidth || !skinheight)
+	{
+		printf("Model has no skin. Use -texwidth and -texheight to set the skin dimensions, or  -tex to import a skin.\n");
+		model_free(model);
+		return false;
+	}
 
 /* allocate memory for writing */
 	data = qmalloc(16*1024*1024); /* FIXME */
 
 /* create 8-bit textures */
-	skinwidth = 0;
-	skinheight = 0;
 	skinfilenames = (char**)qmalloc(sizeof(char*) * model->num_skins);
 
 	for (i = 0; i < model->num_skins; i++)
@@ -848,8 +859,7 @@ skinerror:
 			qfree(skinfilenames[j]);
 		qfree(skinfilenames);
 		qfree(data);
-		if (newmodel)
-			model_free(newmodel);
+		model_free(model);
 		return false;
 	}
 
@@ -967,8 +977,7 @@ skinerror:
 		qfree(skinfilenames[i]);
 	qfree(skinfilenames);
 
-	if (newmodel)
-		model_free(newmodel);
+	model_free(model);
 
 	swap_md2(data, offset);
 	*out_data = data;

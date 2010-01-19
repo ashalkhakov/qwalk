@@ -135,6 +135,8 @@ void model_free(model_t *model);
 void model_generaterenderdata(model_t *model);
 void model_freerenderdata(model_t *model);
 
+void model_clear_skins(model_t *model);
+
 /* note that the filedata pointer is not const, because it may be modified (most likely by byteswapping) */
 bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error);
 

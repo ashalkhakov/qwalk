@@ -27,12 +27,8 @@ static char outfilename[1024] = {0};
 
 static char texfilename[1024] = {0};
 
-static int texwidth = -1;
-static int texheight = -1;
-
-static int flags = 0;
-static int synctype = 0;
-static float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
+int texwidth = -1;
+int texheight = -1;
 
 static model_t *model = NULL;
 
@@ -61,7 +57,7 @@ bool_t replacetexture(const char *filename)
 	size_t filesize;
 	char *error;
 	image_rgba_t *image;
-	int i, j, k;
+	int i;
 	mesh_t *mesh;
 
 	if (!loadfile(filename, &filedata, &filesize, &error))
@@ -82,15 +78,24 @@ bool_t replacetexture(const char *filename)
 
 	qfree(filedata);
 
+/* clear old skins */
+	model_clear_skins(model);
+
+/* add new skin */
+	model->total_skins = 1;
+	model->num_skins = 1;
+	model->skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t));
+	model->skininfo[0].frametime = 0.1f;
+	model->skininfo[0].num_skins = 1;
+	model->skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(singleframe_t));
+	model->skininfo[0].skins[0].name = copystring(filename);
+	model->skininfo[0].skins[0].offset = 0;
+
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		for (j = 0; j < model->total_skins; j++)
-		{
-			for (k = 0; k < SKIN_NUMTYPES; k++)
-				image_free(&mesh->textures[j].components[k]); /* this also sets the image to NULL */
-
-			mesh->textures[j].components[SKIN_DIFFUSE] = image_clone(image);
-		}
+		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
+		mesh->textures[0].components[SKIN_DIFFUSE] = image_clone(image);
+		mesh->textures[0].components[SKIN_FULLBRIGHT] = NULL;
 	}
 
 	image_free(&image);
@@ -237,6 +242,9 @@ void dump_txt(const char *filename, const model_t *model)
 
 int main(int argc, char **argv)
 {
+	int flags = 0;
+	int synctype = 0;
+	float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
 	int i, j, k;
 
 	set_atexit_final_event(dumpleaks);
