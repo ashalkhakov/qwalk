@@ -21,7 +21,6 @@ Features: import mdl, md2, or md3; export mdl.
 - Allow configuration of the fullbright rules when downsampling to the palette
   when exporting MDLs. Possibly just import the colormap, and tell it to ignore
   fullbrights.
-- Generate MD2 glcmds.
 - Write an MD3 writer.
 - Do air-tight error checking to avoid all potential crashes (and detect all
   invalid data imported models).
