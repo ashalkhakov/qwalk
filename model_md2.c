@@ -585,8 +585,8 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 		if (!imagesize)
 		{
 			printf("model_md2_save: failed to create pcx\n");
-			/* FIXME - free stuff */
-			return false;
+			skinfilenames[i] = NULL;
+			goto skinerror;
 		}
 
 		skinfilenames[i] = md2_create_skin_filename(model->skininfo[i].skins[0].name);
@@ -594,14 +594,24 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 		if (!writefile(skinfilenames[i], data, imagesize, &error))
 		{
 			printf("model_md2_save: failed to write %s: %s\n", skinfilenames[i], error);
-			/* FIXME - free stuff */
 			qfree(error);
-			return false;
+			goto skinerror;
 		}
 
 		skinwidth = pimage->width;
 		skinheight = pimage->height;
 		qfree(pimage);
+		continue;
+
+skinerror:
+		qfree(pimage);
+		for (j = 0; j <= i; j++)
+			qfree(skinfilenames[j]);
+		qfree(skinfilenames);
+		qfree(data);
+		if (newmodel)
+			model_free(newmodel);
+		return false;
 	}
 
 /* optimize vertices for md2 format */

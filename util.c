@@ -103,6 +103,15 @@ void strlcpy(char *dest, const char *src, size_t size)
 	}
 }
 
+bool_t yesno(void)
+{
+	char buffer[16];
+
+	fgets(buffer, sizeof(buffer), stdin);
+
+	return (buffer[0] == 'y' || buffer[0] == 'Y') && (!buffer[1] || buffer[1] == '\r' || buffer[1] == '\n');
+}
+
 bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **out_error)
 {
 	FILE *fp;
@@ -168,10 +177,29 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 bool_t writefile(const char *filename, const void *data, size_t size, char **out_error)
 {
 	FILE *fp;
+	bool_t file_exists;
 	size_t wrotesize;
 
 	if (out_error)
 		*out_error = NULL;
+
+	file_exists = false;
+	if ((fp = fopen(filename, "rb")))
+	{
+		file_exists = true;
+		fclose(fp);
+	}
+
+	if (file_exists)
+	{
+		printf("File %s already exists. Overwrite? [y/N] ", filename);
+		if (!yesno())
+		{
+			if (out_error)
+				*out_error = msprintf("User aborted operation");
+			return false;
+		}
+	}
 
 	fp = fopen(filename, "wb");
 	if (!fp)

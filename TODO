@@ -8,7 +8,6 @@ Features: import mdl, md2, or md3; export mdl.
 - Fix crash when exporting a model with no textures.
 - Merge meshes with different textures.
 - Fix byte swapping.
-- Ask before overwriting any files.
 
  +----+
  |TODO|
