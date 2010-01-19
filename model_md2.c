@@ -401,6 +401,142 @@ static char *md2_create_skin_filename(const char *skinname)
 		return msprintf("%s.pcx", skinname);
 }
 
+typedef struct md2_data_s
+{
+	md2_texcoord_t *texcoords; /* [numtexcoords] */
+	int numtexcoords; /* <= mesh->num_vertices */
+	int *texcoord_lookup; /* [mesh->num_vertices] */
+
+	md2_frame_t *frames; /* [model->num_frames] */
+
+	md2_vertex_t *original_vertices; /* [mesh->num_vertices * model->num_frames] */
+
+	int *vertices; /* [numvertices] ; index into original_vertices */
+	int numvertices;
+	int *vertex_lookup; /* [mesh->num_vertices] index into vertices */
+} md2_data_t;
+
+static md2_data_t *md2_process_vertices(const model_t *model, const mesh_t *mesh, int skinwidth, int skinheight)
+{
+	md2_data_t *data;
+	int i, j, k;
+
+	data = (md2_data_t*)qmalloc(sizeof(md2_data_t));
+
+/* convert texcoords to integer and combine duplicates */
+	data->texcoords = (md2_texcoord_t*)qmalloc(sizeof(md2_texcoord_t) * mesh->num_vertices);
+	data->numtexcoords = 0;
+	data->texcoord_lookup = (int*)qmalloc(sizeof(int) * mesh->num_vertices);
+
+	for (i = 0; i < mesh->num_vertices; i++)
+	{
+		md2_texcoord_t md2texcoord;
+
+		md2texcoord.s = (int)(mesh->texcoord2f[i*2+0] * skinwidth);
+		md2texcoord.t = (int)(mesh->texcoord2f[i*2+1] * skinheight);
+
+		for (j = 0; j < data->numtexcoords; j++)
+			if (md2texcoord.s == data->texcoords[j].s && md2texcoord.t == data->texcoords[j].t)
+				break;
+		if (j == data->numtexcoords)
+			data->texcoords[data->numtexcoords++] = md2texcoord;
+		data->texcoord_lookup[i] = j;
+	}
+
+/* compress vertices */
+	data->frames = (md2_frame_t*)qmalloc(sizeof(md2_frame_t) * model->num_frames);
+	data->original_vertices = (md2_vertex_t*)qmalloc(sizeof(md2_vertex_t) * mesh->num_vertices * model->num_frames);
+
+	for (i = 0; i < model->num_frames; i++)
+	{
+		md2_frame_t *md2frame = &data->frames[i];
+		const float *v, *n;
+		float mins[3], maxs[3], iscale[3];
+
+	/* calculate bounds of frame */
+		VectorClear(mins);
+		VectorClear(maxs);
+		v = mesh->vertex3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
+		for (j = 0; j < mesh->num_vertices; j++, v += 3)
+		{
+			for (k = 0; k < 3; k++)
+			{
+				mins[k] = (j == 0) ? v[k] : min(mins[k], v[k]);
+				maxs[k] = (j == 0) ? v[k] : max(maxs[k], v[k]);
+			}
+		}
+
+		for (j = 0; j < 3; j++)
+		{
+			md2frame->scale[j] = (maxs[j] - mins[j]) * (1.0f / 255.0f);
+			md2frame->translate[j] = mins[j];
+
+			iscale[j] = md2frame->scale[j] ? (1.0f / md2frame->scale[j]) : 0.0f;
+		}
+
+	/* compress vertices */
+		v = mesh->vertex3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
+		n = mesh->normal3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
+		for (j = 0; j < mesh->num_vertices; j++, v += 3, n += 3)
+		{
+			md2_vertex_t *md2vertex = &data->original_vertices[j * model->num_frames + i];
+
+			for (k = 0; k < 3; k++)
+			{
+				float pos = (v[k] - md2frame->translate[k]) * iscale[k];
+
+				pos = (float)floor(pos + 0.5f);
+				pos = bound(0.0f, pos, 255.0f);
+
+				md2vertex->v[k] = (unsigned char)pos;
+			}
+
+			md2vertex->lightnormalindex = compress_normal(n);
+		}
+	}
+
+/* combine duplicate vertices */
+	data->vertices = (int*)qmalloc(sizeof(int) * mesh->num_vertices);
+	data->numvertices = 0;
+	data->vertex_lookup = (int*)qmalloc(sizeof(int) * mesh->num_vertices);
+
+	for (i = 0; i < mesh->num_vertices; i++)
+	{
+		const md2_vertex_t *v1 = data->original_vertices + i * model->num_frames;
+
+	/* see if a vertex at this position already exists */
+		for (j = 0; j < data->numvertices; j++)
+		{
+			const md2_vertex_t *v2 = data->original_vertices + data->vertices[j] * model->num_frames;
+
+			for (k = 0; k < model->num_frames; k++)
+				if (v1[k].v[0] != v2[k].v[0] || v1[k].v[1] != v2[k].v[1] || v1[k].v[2] != v2[k].v[2] || v1[k].lightnormalindex != v2[k].lightnormalindex)
+					break;
+			if (k == model->num_frames)
+				break;
+		}
+		if (j == data->numvertices)
+		{
+		/* no match, add this one */
+			data->vertices[data->numvertices++] = i;
+		}
+		data->vertex_lookup[i] = j;
+	}
+
+	return data;
+}
+
+static void md2_free_data(md2_data_t *data)
+{
+	qfree(data->texcoords);
+	qfree(data->texcoord_lookup);
+	qfree(data->frames);
+	qfree(data->original_vertices);
+	qfree(data->vertices);
+	qfree(data->vertex_lookup);
+	qfree(data);
+}
+
 bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 {
 	char *error;
@@ -409,6 +545,7 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	char **skinfilenames;
 	model_t *newmodel;
 	const mesh_t *mesh;
+	md2_data_t *md2data;
 	md2_header_t *header;
 	int offset;
 	int i, j, k;
@@ -467,6 +604,9 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 		qfree(pimage);
 	}
 
+/* optimize vertices for md2 format */
+	md2data = md2_process_vertices(model, mesh, skinwidth, skinheight);
+
 /* write header */
 	offset = 0;
 
@@ -476,10 +616,10 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	header->version = 8;
 	header->skinwidth = skinwidth;
 	header->skinheight = skinheight;
-	header->framesize = sizeof(md2_frame_t) + sizeof(md2_vertex_t) * (mesh->num_vertices - 1); /* subtract one because md2_frame_t has an array of one */
+	header->framesize = sizeof(md2_frame_t) + sizeof(md2_vertex_t) * (md2data->numvertices - 1); /* subtract one because md2_frame_t has an array of one */
 	header->num_skins = model->num_skins;
-	header->num_vertices = mesh->num_vertices;
-	header->num_st = mesh->num_vertices;
+	header->num_vertices = md2data->numvertices;
+	header->num_st = md2data->numtexcoords;
 	header->num_tris = mesh->num_triangles;
 	header->num_glcmds = 0;
 	header->num_frames = model->num_frames;
@@ -506,15 +646,9 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 /* write texcoords */
 	header->offset_st = offset;
 
-	for (i = 0; i < mesh->num_vertices; i++)
-	{
-		md2_texcoord_t *md2texcoord = (md2_texcoord_t*)(data + offset);
+	memcpy(data + offset, md2data->texcoords, sizeof(md2_texcoord_t) * md2data->numtexcoords);
 
-		md2texcoord->s = (int)(mesh->texcoord2f[i*2+0] * header->skinwidth);
-		md2texcoord->t = (int)(mesh->texcoord2f[i*2+1] * header->skinheight);
-
-		offset += sizeof(md2_texcoord_t);
-	}
+	offset += sizeof(md2_texcoord_t) * md2data->numtexcoords;
 
 /* write triangles */
 	header->offset_tris = offset;
@@ -525,8 +659,8 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 
 		for (j = 0; j < 3; j++)
 		{
-			md2triangle->vertex[j] = mesh->triangle3i[i*3+j];
-			md2triangle->st[j] = mesh->triangle3i[i*3+j];
+			md2triangle->vertex[j] = md2data->vertex_lookup[mesh->triangle3i[i*3+j]];
+			md2triangle->st[j] = md2data->texcoord_lookup[mesh->triangle3i[i*3+j]];
 		}
 
 		offset += sizeof(md2_triangle_t);
@@ -538,45 +672,24 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	for (i = 0; i < model->num_frames; i++)
 	{
 		md2_frame_t *md2frame = (md2_frame_t*)(data + offset);
-		float mins[3], maxs[3];
-		const float *v, *n;
 
 		strlcpy(md2frame->name, model->frameinfo[i].frames[0].name, sizeof(md2frame->name));
 
-	/* calculate bounds of frame */
-		mins[0] = mins[1] = mins[2] = maxs[0] = maxs[1] = maxs[2] = 0.0f;
-		v = mesh->vertex3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
-		for (j = 0; j < mesh->num_vertices; j++, v += 3)
-		{
-			for (k = 0; k < 3; k++)
-			{
-				mins[k] = min(mins[k], v[k]);
-				maxs[k] = max(maxs[k], v[k]);
-			}
-		}
-
 		for (j = 0; j < 3; j++)
 		{
-			md2frame->scale[j] = (maxs[j] - mins[j]) * (1.0f / 255.0f);
-			md2frame->translate[j] = mins[j];
+			md2frame->scale[j] = md2data->frames[i].scale[j];
+			md2frame->translate[j] = md2data->frames[i].translate[j];
 		}
 
 	/* write vertices */
-		v = mesh->vertex3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
-		n = mesh->normal3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
-		for (j = 0; j < mesh->num_vertices; j++, v += 3, n += 3)
+		for (j = 0; j < md2data->numvertices; j++)
 		{
+			const md2_vertex_t *md2vertex = md2data->original_vertices + md2data->vertices[j] * model->num_frames + i;
+
 			for (k = 0; k < 3; k++)
-			{
-				float pos = (v[k] - md2frame->translate[k]) / md2frame->scale[k];
+				md2frame->verts[j].v[k] = md2vertex->v[k];
 
-				pos = (float)floor(pos + 0.5f);
-				pos = bound(0.0f, pos, 255.0f);
-
-				md2frame->verts[j].v[k] = (unsigned char)pos;
-			}
-
-			md2frame->verts[j].lightnormalindex = compress_normal(n);
+			md2frame->verts[j].lightnormalindex = md2vertex->lightnormalindex;
 		}
 
 		offset += header->framesize;
@@ -589,6 +702,8 @@ bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
 	header->offset_end = offset;
 
 /* done */
+	md2_free_data(md2data);
+
 	for (i = 0; i < model->num_skins; i++)
 		qfree(skinfilenames[i]);
 	qfree(skinfilenames);

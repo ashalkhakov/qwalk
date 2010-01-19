@@ -1,15 +1,14 @@
 
- +---------------------------+
- | Roadmap for first release |
- +---------------------------+
+ +-----------+
+ | Important |
+ +-----------+
 
 Features: import mdl, md2, or md3; export mdl.
 
 - Fix crash when exporting a model with no textures.
 - Merge meshes with different textures.
-- When exporting MD2, merge all vertices with the same normal but different
-  texcoords, since texcoords are stored per-triangle.
 - Fix byte swapping.
+- Ask before overwriting any files.
 
  +----+
  |TODO|

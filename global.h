@@ -46,6 +46,7 @@ typedef enum { false = 0, true = 1 } bool_t;
 
 typedef float vec3f_t[3];
 
+#define VectorClear(a) ((a)[0]=0,(a)[1]=0,(a)[2]=0)
 #define DotProduct(a,b) ((a)[0]*(b)[0]+(a)[1]*(b)[1]+(a)[2]*(b)[2])
 #define VectorSubtract(a,b,c) ((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1],(c)[2]=(a)[2]-(b)[2])
 #define VectorScale(in, scale, out) ((out)[0] = (in)[0] * (scale),(out)[1] = (in)[1] * (scale),(out)[2] = (in)[2] * (scale))
