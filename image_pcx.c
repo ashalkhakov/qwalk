@@ -125,12 +125,15 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 
 /* grab the palette from the end of the file */
 	palette768 = (unsigned char*)filedata + filesize - 768;
-	if (palette768[-1] != 0x0c)
+
+/* there is supposed to be an extra byte, 0x0c, before the palette. but, qME forgets this when exporting pcxes, so we'll
+ * have to let it slide */
+/*	if (palette768[-1] != 0x0c)
 	{
 		if (out_error)
 			*out_error = msprintf("pcx: bad palette format");
 		return NULL;
-	}
+	}*/
 
 	image = image_alloc(header->xmax - header->xmin + 1, header->ymax - header->ymin + 1);
 	if (!image)
