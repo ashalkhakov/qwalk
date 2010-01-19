@@ -29,6 +29,10 @@
 #include "model.h"
 #include "matrix.h"
 
+extern void loadfont(void);
+extern void freefont(void);
+extern void drawstringf(int x, int y, const char *s, ...);
+
 int vid_width = -1;
 int vid_height = -1;
 
@@ -53,6 +57,8 @@ bool_t firstperson = false;
 bool_t nolerp = false;
 bool_t wireframe = false;
 int g_frame = -1;
+
+bool_t showoverlay = false;
 
 bool_t freezelighting = false;
 vec3f_t g_lightpos;
@@ -184,6 +190,9 @@ void r_init(void)
 	glDepthMask(GL_TRUE); CHECKGLERROR();
 
 	glDisable(GL_TEXTURE_2D); CHECKGLERROR();
+
+/* create and upload font */
+	loadfont();
 
 /* upload mesh textures */
 	model_generaterenderdata(model);
@@ -482,6 +491,9 @@ void render(void)
 {
 	int i;
 
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glMatrixMode(GL_PROJECTION);
@@ -629,6 +641,22 @@ void render(void)
 	}
 	glEnd();
 	glColor4f(1, 1, 1, 1);
+
+/* set 2d matrix */
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, vid_width, vid_height, 0, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+
+/* draw 2d stuff */
+	if (showoverlay)
+	{
+		drawstringf(0, 0, "Press F1 to hide this text");
+		drawstringf(0, 12, "Skin %d of %d (press / to cycle)", g_skin + 1, model->num_skins);
+	}
 
 /* done */
 	SDL_GL_SwapBuffers();
@@ -965,6 +993,8 @@ int main(int argc, char **argv)
 					if (g_skin >= model->num_skins)
 						g_skin = 0;
 				}
+				if (event.key.keysym.sym == SDLK_F1)
+					showoverlay = !showoverlay;
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 				if (event.button.button == SDL_BUTTON_LEFT)

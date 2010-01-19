@@ -216,6 +216,9 @@ void *qmalloc_(size_t numbytes, const char *file, int line)
 	alloc_t *alloc;
 	void *mem;
 
+	if (!numbytes)
+		return NULL;
+
 /*	numbytes = (numbytes + 7) & ~7;*/
 
 	mem = malloc(sizeof(alloc_t) + numbytes);

@@ -28,7 +28,7 @@ viewer:
 modelconv_: $(OBJECTS) modelconv.o
 	$(CC) -o modelconv $^ $(LDFLAGS)
 
-viewer_: $(OBJECTS) viewer.o
+viewer_: $(OBJECTS) v_font.o viewer.o
 	$(CC) -o viewer $^ $(LDFLAGS)
 
 clean:

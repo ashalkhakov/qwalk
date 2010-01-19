@@ -225,6 +225,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\v_font.c"
+				>
+			</File>
+			<File
 				RelativePath=".\viewer.c"
 				>
 			</File>

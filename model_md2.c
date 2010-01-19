@@ -184,7 +184,6 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	md2_header_t *header;
 	int i, j;
 	const md2_skin_t *md2skins;
-	const md2_frame_t *md2frames;
 	const md2_texcoord_t *md2texcoords;
 	const md2_triangle_t *md2triangles;
 	model_t model;
@@ -213,22 +212,37 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* stuff */
 	md2skins = (md2_skin_t*)(f + header->offset_skins);
-	md2frames = (md2_frame_t*)(f + header->offset_frames);
 	md2texcoords = (md2_texcoord_t*)(f + header->offset_st);
 	md2triangles = (md2_triangle_t*)(f + header->offset_tris);
 
 /* stuff */
-	model.total_skins = header->num_skins;
-	model.num_skins = header->num_skins;
-	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
-
-	for (i = 0; i < model.num_skins; i++)
+	if (header->num_skins > 0)
 	{
-		model.skininfo[i].frametime = 0.1f;
-		model.skininfo[i].num_skins = 1;
-		model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-		model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
-		model.skininfo[i].skins[0].offset = i;
+		model.total_skins = header->num_skins;
+		model.num_skins = header->num_skins;
+		model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+
+		for (i = 0; i < model.num_skins; i++)
+		{
+			model.skininfo[i].frametime = 0.1f;
+			model.skininfo[i].num_skins = 1;
+			model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+			model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
+			model.skininfo[i].skins[0].offset = i;
+		}
+	}
+	else
+	{
+	/* quake2 player models don't reference any skins inside the model, so create a blank one */
+		model.total_skins = 1;
+		model.num_skins = 1;
+		model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t));
+
+		model.skininfo[0].frametime = 0.1f;
+		model.skininfo[0].num_skins = 1;
+		model.skininfo[0].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+		model.skininfo[0].skins[0].name = copystring("skin");
+		model.skininfo[0].skins[0].offset = 0;
 	}
 
 	model.total_frames = header->num_frames;
@@ -237,10 +251,12 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	for (i = 0; i < model.num_frames; i++)
 	{
+		const md2_frame_t *md2frame = (const md2_frame_t*)(f + header->offset_frames + i * header->framesize);
+
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
 		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = copystring(md2frames[i].name);
+		model.frameinfo[i].frames[0].name = copystring(md2frame->name);
 		model.frameinfo[i].frames[0].offset = i;
 	}
 
@@ -261,33 +277,42 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.num_skins);
 	for (i = 0; i < model.num_skins; i++)
 	{
-		void *filedata;
-		size_t filesize;
-		char *error;
 		image_rgba_t *image;
 
 		for (j = 0; j < SKIN_NUMTYPES; j++)
 			mesh->textures[i].components[j] = NULL;
 
-	/* try to load the image file mentioned in the md2 */
-	/* if any of the skins fail to load, they will be left as null */
-		if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
+		if (header->num_skins > 0)
 		{
-			printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
-			qfree(error);
-			continue;
-		}
+			void *filedata;
+			size_t filesize;
+			char *error;
 
-		image = image_load(md2skins[i].name, filedata, filesize, &error);
-		if (!image)
-		{
-			printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
-			qfree(error);
+		/* try to load the image file mentioned in the md2 */
+		/* if any of the skins fail to load, they will be left as null */
+			if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
+			{
+				printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
+				qfree(error);
+				continue;
+			}
+
+			image = image_load(md2skins[i].name, filedata, filesize, &error);
+			if (!image)
+			{
+				printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
+				qfree(error);
+				qfree(filedata);
+				continue;
+			}
+
 			qfree(filedata);
-			continue;
 		}
-
-		qfree(filedata);
+		else
+		{
+		/* quake2 player models don't reference any skins inside the model, so create a blank one */
+			image = image_createfill(header->skinwidth, header->skinheight, 192, 192, 192, 255);
+		}
 
 		mesh->textures[i].components[SKIN_DIFFUSE] = image;
 	}
