@@ -55,31 +55,31 @@ typedef struct md2_skin_s
 	char name[64];
 } md2_skin_t;
 
-typedef struct md2_texcoord_s
+typedef struct dstvert_s
 {
 	short s;
 	short t;
-} md2_texcoord_t;
+} dstvert_t;
 
-typedef struct md2_triangle_s
+typedef struct dtriangle_s
 {
-	unsigned short vertex[3];
-	unsigned short st[3];
-} md2_triangle_t;
+	unsigned short index_xyz[3];
+	unsigned short index_st[3];
+} dtriangle_t;
 
-typedef struct md2_vertex_s
+typedef struct dtrivertx_s
 {
 	unsigned char v[3];
 	unsigned char lightnormalindex;
-} md2_vertex_t;
+} dtrivertx_t;
 
-typedef struct md2_frame_s
+typedef struct daliasframe_s
 {
 	float scale[3];
 	float translate[3];
 	char name[16];
-	md2_vertex_t verts[1];
-} md2_frame_t;
+	dtrivertx_t verts[1];
+} daliasframe_t;
 
 static palette_t quake2palette =
 {
@@ -135,7 +135,7 @@ static void swap_md2(void *filedata, size_t filesize)
 /* swap texcoords */
 	for (i = 0; i < header->num_st; i++)
 	{
-		md2_texcoord_t *texcoord = (md2_texcoord_t*)(f + header->offset_st) + i;
+		dstvert_t *texcoord = (dstvert_t*)(f + header->offset_st) + i;
 		texcoord->s = LittleShort(texcoord->s);
 		texcoord->t = LittleShort(texcoord->t);
 	}
@@ -143,23 +143,28 @@ static void swap_md2(void *filedata, size_t filesize)
 /* swap triangles */
 	for (i = 0; i < header->num_tris; i++)
 	{
-		md2_triangle_t *triangle = (md2_triangle_t*)(f + header->offset_tris) + i;
-		triangle->vertex[0] = LittleShort(triangle->vertex[0]);
-		triangle->vertex[1] = LittleShort(triangle->vertex[1]);
-		triangle->vertex[2] = LittleShort(triangle->vertex[2]);
-		triangle->st[0] = LittleShort(triangle->st[0]);
-		triangle->st[1] = LittleShort(triangle->st[1]);
-		triangle->st[2] = LittleShort(triangle->st[2]);
+		dtriangle_t *triangle = (dtriangle_t*)(f + header->offset_tris) + i;
+		triangle->index_xyz[0] = LittleShort(triangle->index_xyz[0]);
+		triangle->index_xyz[1] = LittleShort(triangle->index_xyz[1]);
+		triangle->index_xyz[2] = LittleShort(triangle->index_xyz[2]);
+		triangle->index_st[0] = LittleShort(triangle->index_st[0]);
+		triangle->index_st[1] = LittleShort(triangle->index_st[1]);
+		triangle->index_st[2] = LittleShort(triangle->index_st[2]);
 	}
 
-/* skip glcmds (FIXME - they have to be swapped when we export the model) */
+/* swap glcmds */
+	for (i = 0; i < header->num_glcmds; i++)
+	{
+		int *glcmd = (int*)(f + header->offset_glcmds) + i;
+		*glcmd = LittleLong(*glcmd);
+	}
 
 /* read frames */
 	f += header->offset_frames;
 
 	for (i = 0; i < header->num_frames; i++)
 	{
-		md2_frame_t *frame = (md2_frame_t*)f;
+		daliasframe_t *frame = (daliasframe_t*)f;
 
 		frame->scale[0] = LittleFloat(frame->scale[0]);
 		frame->scale[1] = LittleFloat(frame->scale[1]);
@@ -184,8 +189,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	md2_header_t *header;
 	int i, j;
 	const md2_skin_t *md2skins;
-	const md2_texcoord_t *md2texcoords;
-	const md2_triangle_t *md2triangles;
+	const dstvert_t *dstverts;
+	const dtriangle_t *dtriangles;
 	model_t model;
 	mesh_t *mesh;
 	md2_meshvert_t *meshverts;
@@ -212,8 +217,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* stuff */
 	md2skins = (md2_skin_t*)(f + header->offset_skins);
-	md2texcoords = (md2_texcoord_t*)(f + header->offset_st);
-	md2triangles = (md2_triangle_t*)(f + header->offset_tris);
+	dstverts = (dstvert_t*)(f + header->offset_st);
+	dtriangles = (dtriangle_t*)(f + header->offset_tris);
 
 /* stuff */
 	if (header->num_skins > 0)
@@ -251,7 +256,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	for (i = 0; i < model.num_frames; i++)
 	{
-		const md2_frame_t *md2frame = (const md2_frame_t*)(f + header->offset_frames + i * header->framesize);
+		const daliasframe_t *md2frame = (const daliasframe_t*)(f + header->offset_frames + i * header->framesize);
 
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
@@ -327,8 +332,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		for (j = 0; j < 3; j++)
 		{
 			int vertnum;
-			unsigned short xyz = md2triangles[i].vertex[j];
-			unsigned short st = md2triangles[i].st[j];
+			unsigned short xyz = dtriangles[i].index_xyz[j];
+			unsigned short st = dtriangles[i].index_st[j];
 
 			for (vertnum = 0; vertnum < mesh->num_vertices; vertnum++)
 			{
@@ -355,8 +360,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	iheight = 1.0f / header->skinheight;
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		mesh->texcoord2f[i*2+0] = (md2texcoords[meshverts[i].texcoord].s + 0.5f) * iwidth;
-		mesh->texcoord2f[i*2+1] = (md2texcoords[meshverts[i].texcoord].t + 0.5f) * iheight;
+		mesh->texcoord2f[i*2+0] = (dstverts[meshverts[i].texcoord].s + 0.5f) * iwidth;
+		mesh->texcoord2f[i*2+1] = (dstverts[meshverts[i].texcoord].t + 0.5f) * iheight;
 	}
 
 	mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
@@ -364,12 +369,12 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	f += header->offset_frames;
 	for (i = 0; i < model.num_frames; i++)
 	{
-		md2_frame_t *frame = (md2_frame_t*)f;
+		daliasframe_t *frame = (daliasframe_t*)f;
 		int firstvertex = i * mesh->num_vertices * 3;
 
 		for (j = 0; j < mesh->num_vertices; j++)
 		{
-			md2_vertex_t *vtx = &frame->verts[meshverts[j].vertex];
+			dtrivertx_t *vtx = &frame->verts[meshverts[j].vertex];
 			float *v = mesh->vertex3f + firstvertex + j * 3;
 			float *n = mesh->normal3f + firstvertex + j * 3;
 
@@ -403,13 +408,13 @@ static char *md2_create_skin_filename(const char *skinname)
 
 typedef struct md2_data_s
 {
-	md2_texcoord_t *texcoords; /* [numtexcoords] */
+	dstvert_t *texcoords; /* [numtexcoords] */
 	int numtexcoords; /* <= mesh->num_vertices */
 	int *texcoord_lookup; /* [mesh->num_vertices] */
 
-	md2_frame_t *frames; /* [model->num_frames] */
+	daliasframe_t *frames; /* [model->num_frames] */
 
-	md2_vertex_t *original_vertices; /* [mesh->num_vertices * model->num_frames] */
+	dtrivertx_t *original_vertices; /* [mesh->num_vertices * model->num_frames] */
 
 	int *vertices; /* [numvertices] ; index into original_vertices */
 	int numvertices;
@@ -424,13 +429,13 @@ static md2_data_t *md2_process_vertices(const model_t *model, const mesh_t *mesh
 	data = (md2_data_t*)qmalloc(sizeof(md2_data_t));
 
 /* convert texcoords to integer and combine duplicates */
-	data->texcoords = (md2_texcoord_t*)qmalloc(sizeof(md2_texcoord_t) * mesh->num_vertices);
+	data->texcoords = (dstvert_t*)qmalloc(sizeof(dstvert_t) * mesh->num_vertices);
 	data->numtexcoords = 0;
 	data->texcoord_lookup = (int*)qmalloc(sizeof(int) * mesh->num_vertices);
 
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		md2_texcoord_t md2texcoord;
+		dstvert_t md2texcoord;
 
 		md2texcoord.s = (int)(mesh->texcoord2f[i*2+0] * skinwidth);
 		md2texcoord.t = (int)(mesh->texcoord2f[i*2+1] * skinheight);
@@ -444,12 +449,12 @@ static md2_data_t *md2_process_vertices(const model_t *model, const mesh_t *mesh
 	}
 
 /* compress vertices */
-	data->frames = (md2_frame_t*)qmalloc(sizeof(md2_frame_t) * model->num_frames);
-	data->original_vertices = (md2_vertex_t*)qmalloc(sizeof(md2_vertex_t) * mesh->num_vertices * model->num_frames);
+	data->frames = (daliasframe_t*)qmalloc(sizeof(daliasframe_t) * model->num_frames);
+	data->original_vertices = (dtrivertx_t*)qmalloc(sizeof(dtrivertx_t) * mesh->num_vertices * model->num_frames);
 
 	for (i = 0; i < model->num_frames; i++)
 	{
-		md2_frame_t *md2frame = &data->frames[i];
+		daliasframe_t *md2frame = &data->frames[i];
 		const float *v, *n;
 		float mins[3], maxs[3], iscale[3];
 
@@ -479,7 +484,7 @@ static md2_data_t *md2_process_vertices(const model_t *model, const mesh_t *mesh
 		n = mesh->normal3f + model->frameinfo[i].frames[0].offset * mesh->num_vertices * 3;
 		for (j = 0; j < mesh->num_vertices; j++, v += 3, n += 3)
 		{
-			md2_vertex_t *md2vertex = &data->original_vertices[j * model->num_frames + i];
+			dtrivertx_t *md2vertex = &data->original_vertices[j * model->num_frames + i];
 
 			for (k = 0; k < 3; k++)
 			{
@@ -502,12 +507,12 @@ static md2_data_t *md2_process_vertices(const model_t *model, const mesh_t *mesh
 
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		const md2_vertex_t *v1 = data->original_vertices + i * model->num_frames;
+		const dtrivertx_t *v1 = data->original_vertices + i * model->num_frames;
 
 	/* see if a vertex at this position already exists */
 		for (j = 0; j < data->numvertices; j++)
 		{
-			const md2_vertex_t *v2 = data->original_vertices + data->vertices[j] * model->num_frames;
+			const dtrivertx_t *v2 = data->original_vertices + data->vertices[j] * model->num_frames;
 
 			for (k = 0; k < model->num_frames; k++)
 				if (v1[k].v[0] != v2[k].v[0] || v1[k].v[1] != v2[k].v[1] || v1[k].v[2] != v2[k].v[2] || v1[k].lightnormalindex != v2[k].lightnormalindex)
@@ -535,6 +540,240 @@ static void md2_free_data(md2_data_t *data)
 	qfree(data->vertices);
 	qfree(data->vertex_lookup);
 	qfree(data);
+}
+
+/* md2 glcmds generation, taken from quake2 source (models.c) */
+
+static int commands[16384];
+static int numcommands;
+static int *used;
+
+static int strip_xyz[128];
+static int strip_st[128];
+static int strip_tris[128];
+static int stripcount;
+
+static dtriangle_t *triangles;
+static int num_tris;
+
+static int md2_strip_length(int starttri, int startv)
+{
+	int m1, m2;
+	int st1, st2;
+	int j;
+	dtriangle_t *last, *check;
+	int k;
+
+	used[starttri] = 2;
+
+	last = &triangles[starttri];
+
+	strip_xyz[0] = last->index_xyz[(startv  )%3];
+	strip_xyz[1] = last->index_xyz[(startv+1)%3];
+	strip_xyz[2] = last->index_xyz[(startv+2)%3];
+	strip_st[0] = last->index_st[(startv  )%3];
+	strip_st[1] = last->index_st[(startv+1)%3];
+	strip_st[2] = last->index_st[(startv+2)%3];
+
+	strip_tris[0] = starttri;
+	stripcount = 1;
+
+	m1 = last->index_xyz[(startv+2)%3];
+	st1 = last->index_st[(startv+2)%3];
+	m2 = last->index_xyz[(startv+1)%3];
+	st2 = last->index_st[(startv+1)%3];
+
+/* look for a matching triangle */
+nexttri:
+	for (j = starttri + 1, check = &triangles[starttri + 1]; j < num_tris; j++, check++)
+	{
+		for (k = 0; k < 3; k++)
+		{
+			if (check->index_xyz[k] != m1)
+				continue;
+			if (check->index_st[k] != st1)
+				continue;
+			if (check->index_xyz[(k+1)%3] != m2)
+				continue;
+			if (check->index_st[(k+1)%3] != st2)
+				continue;
+
+		/* this is the next part of the fan */
+
+		/* if we can't use this triangle, this tristrip is done */
+			if (used[j])
+				goto done;
+
+		/* the new edge */
+			if (stripcount & 1)
+			{
+				m2 = check->index_xyz[(k+2)%3];
+				st2 = check->index_st[(k+2)%3];
+			}
+			else
+			{
+				m1 = check->index_xyz[(k+2)%3];
+				st1 = check->index_st[(k+2)%3];
+			}
+
+			strip_xyz[stripcount+2] = check->index_xyz[(k+2)%3];
+			strip_st[stripcount+2] = check->index_st[(k+2)%3];
+			strip_tris[stripcount] = j;
+			stripcount++;
+
+			used[j] = 2;
+			goto nexttri;
+		}
+	}
+done:
+
+/* clear the temp used flags */
+	for (j = starttri + 1; j < num_tris; j++)
+		if (used[j] == 2)
+			used[j] = 0;
+
+	return stripcount;
+}
+
+static int md2_fan_length(int starttri, int startv)
+{
+	int m1, m2;
+	int st1, st2;
+	int j;
+	dtriangle_t *last, *check;
+	int k;
+
+	used[starttri] = 2;
+
+	last = &triangles[starttri];
+
+	strip_xyz[0] = last->index_xyz[(startv  )%3];
+	strip_xyz[1] = last->index_xyz[(startv+1)%3];
+	strip_xyz[2] = last->index_xyz[(startv+2)%3];
+	strip_st[0] = last->index_st[(startv  )%3];
+	strip_st[1] = last->index_st[(startv+1)%3];
+	strip_st[2] = last->index_st[(startv+2)%3];
+
+	strip_tris[0] = starttri;
+	stripcount = 1;
+
+	m1 = last->index_xyz[(startv+0)%3];
+	st1 = last->index_st[(startv+0)%3];
+	m2 = last->index_xyz[(startv+2)%3];
+	st2 = last->index_st[(startv+2)%3];
+
+
+/* look for a matching triangle */
+nexttri:
+	for (j = starttri + 1, check = &triangles[starttri + 1]; j < num_tris; j++, check++)
+	{
+		for (k = 0; k < 3; k++)
+		{
+			if (check->index_xyz[k] != m1)
+				continue;
+			if (check->index_st[k] != st1)
+				continue;
+			if (check->index_xyz[(k+1)%3] != m2)
+				continue;
+			if (check->index_st[(k+1)%3] != st2)
+				continue;
+
+		/* this is the next part of the fan */
+
+		/* if we can't use this triangle, this tristrip is done */
+			if (used[j])
+				goto done;
+
+		/* the new edge */
+			m2 = check->index_xyz[(k+2)%3];
+			st2 = check->index_st[(k+2)%3];
+
+			strip_xyz[stripcount+2] = m2;
+			strip_st[stripcount+2] = st2;
+			strip_tris[stripcount] = j;
+			stripcount++;
+
+			used[j] = 2;
+			goto nexttri;
+		}
+	}
+done:
+
+/* clear the temp used flags */
+	for (j = starttri + 1; j < num_tris; j++)
+		if (used[j] == 2)
+			used[j] = 0;
+
+	return stripcount;
+}
+
+static void md2_build_glcmds(const dstvert_t *texcoords, int skinwidth, int skinheight)
+{
+	int i, j;
+	int startv;
+	int len, bestlen, besttype;
+	int best_xyz[1024];
+	int best_st[1024];
+	int best_tris[1024];
+	int type;
+
+	numcommands = 0;
+	used = (int*)qmalloc(sizeof(int) * num_tris);
+	memset(used, 0, sizeof(int) * num_tris);
+	for (i = 0; i < num_tris; i++)
+	{
+	/* pick an unused triangle and start the trifan */
+		if (used[i])
+			continue;
+
+		bestlen = 0;
+		for (type = 0; type < 2; type++)
+		{
+			for (startv = 0; startv < 3; startv++)
+			{
+				if (type == 1)
+					len = md2_strip_length(i, startv);
+				else
+					len = md2_fan_length(i, startv);
+
+				if (len > bestlen)
+				{
+					besttype = type;
+					bestlen = len;
+					for (j = 0; j < bestlen + 2; j++)
+					{
+						best_st[j] = strip_st[j];
+						best_xyz[j] = strip_xyz[j];
+					}
+					for (j = 0; j < bestlen; j++)
+						best_tris[j] = strip_tris[j];
+				}
+			}
+		}
+
+	/* mark the tris on the best strip/fan as used */
+		for (j = 0; j < bestlen; j++)
+			used[best_tris[j]] = 1;
+
+		if (besttype == 1)
+			commands[numcommands++] = (bestlen+2);
+		else
+			commands[numcommands++] = -(bestlen+2);
+
+		for (j = 0; j < bestlen + 2; j++)
+		{
+			union { float f; int i; } u;
+			u.f = (texcoords[best_st[j]].s + 0.5f) / skinwidth;
+			commands[numcommands++] = u.i;
+			u.f = (texcoords[best_st[j]].t + 0.5f) / skinheight;
+			commands[numcommands++] = u.i;
+			commands[numcommands++] = best_xyz[j];
+		}
+	}
+
+	commands[numcommands++] = 0; /* end of list marker */
+
+	qfree(used);
 }
 
 bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size)
@@ -626,12 +865,12 @@ skinerror:
 	header->version = 8;
 	header->skinwidth = skinwidth;
 	header->skinheight = skinheight;
-	header->framesize = sizeof(md2_frame_t) + sizeof(md2_vertex_t) * (md2data->numvertices - 1); /* subtract one because md2_frame_t has an array of one */
+	header->framesize = sizeof(daliasframe_t) + sizeof(dtrivertx_t) * (md2data->numvertices - 1); /* subtract one because md2_frame_t has an array of one */
 	header->num_skins = model->num_skins;
 	header->num_vertices = md2data->numvertices;
 	header->num_st = md2data->numtexcoords;
 	header->num_tris = mesh->num_triangles;
-	header->num_glcmds = 0;
+	header->num_glcmds = 0; /* filled in later */
 	header->num_frames = model->num_frames;
 	header->offset_skins = 0;
 	header->offset_st = 0;
@@ -656,24 +895,24 @@ skinerror:
 /* write texcoords */
 	header->offset_st = offset;
 
-	memcpy(data + offset, md2data->texcoords, sizeof(md2_texcoord_t) * md2data->numtexcoords);
+	memcpy(data + offset, md2data->texcoords, sizeof(dstvert_t) * md2data->numtexcoords);
 
-	offset += sizeof(md2_texcoord_t) * md2data->numtexcoords;
+	offset += sizeof(dstvert_t) * md2data->numtexcoords;
 
 /* write triangles */
 	header->offset_tris = offset;
 
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
-		md2_triangle_t *md2triangle = (md2_triangle_t*)(data + offset);
+		dtriangle_t *dtriangle = (dtriangle_t*)(data + offset);
 
 		for (j = 0; j < 3; j++)
 		{
-			md2triangle->vertex[j] = md2data->vertex_lookup[mesh->triangle3i[i*3+j]];
-			md2triangle->st[j] = md2data->texcoord_lookup[mesh->triangle3i[i*3+j]];
+			dtriangle->index_xyz[j] = md2data->vertex_lookup[mesh->triangle3i[i*3+j]];
+			dtriangle->index_st[j] = md2data->texcoord_lookup[mesh->triangle3i[i*3+j]];
 		}
 
-		offset += sizeof(md2_triangle_t);
+		offset += sizeof(dtriangle_t);
 	}
 
 /* write frames */
@@ -681,7 +920,7 @@ skinerror:
 
 	for (i = 0; i < model->num_frames; i++)
 	{
-		md2_frame_t *md2frame = (md2_frame_t*)(data + offset);
+		daliasframe_t *md2frame = (daliasframe_t*)(data + offset);
 
 		strlcpy(md2frame->name, model->frameinfo[i].frames[0].name, sizeof(md2frame->name));
 
@@ -694,7 +933,7 @@ skinerror:
 	/* write vertices */
 		for (j = 0; j < md2data->numvertices; j++)
 		{
-			const md2_vertex_t *md2vertex = md2data->original_vertices + md2data->vertices[j] * model->num_frames + i;
+			const dtrivertx_t *md2vertex = md2data->original_vertices + md2data->vertices[j] * model->num_frames + i;
 
 			for (k = 0; k < 3; k++)
 				md2frame->verts[j].v[k] = md2vertex->v[k];
@@ -706,7 +945,17 @@ skinerror:
 	}
 
 /* write glcmds */
+	triangles = (dtriangle_t*)(data + header->offset_tris);
+	num_tris = header->num_tris;
+
+	md2_build_glcmds((dstvert_t*)(data + header->offset_st), header->skinwidth, header->skinheight);
+
+	header->num_glcmds = numcommands;
 	header->offset_glcmds = offset;
+
+	memcpy(data + offset, commands, sizeof(int) * numcommands);
+
+	offset += sizeof(int) * numcommands;
 
 /* write end */
 	header->offset_end = offset;
