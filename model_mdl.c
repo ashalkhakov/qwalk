@@ -537,11 +537,11 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	qfree(meshverts);
 	qfree(framevertstart);
 
-	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.total_skins);
+	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.total_skins);
 	for (i = 0; i < model.total_skins; i++)
 	{
-		mesh->textures[i].components[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
-		mesh->textures[i].components[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
 
 		for (j = 0; j < header->skinwidth * header->skinheight; j++)
 		{
@@ -550,28 +550,28 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			if (quakepalette.fullbright_flags[c >> 5] & (1U << (c & 31)))
 			{
 			/* fullbright */
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = 0;
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = 0;
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = 0;
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = 0;
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = 0;
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = 0;
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
 
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
 			}
 			else
 			{
 			/* normal colour */
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
-				mesh->textures[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+0] = quakepalette.rgb[c*3+0];
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+1] = quakepalette.rgb[c*3+1];
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+2] = quakepalette.rgb[c*3+2];
+				mesh->skins[i].components[SKIN_DIFFUSE]->pixels[j*4+3] = 255;
 
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = 0;
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = 0;
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = 0;
-				mesh->textures[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = 0;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = 0;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = 0;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
 			}
 		}
 	}
@@ -608,28 +608,28 @@ bool_t model_mdl_save(const model_t *orig_model, void **out_data, size_t *out_si
 		{
 			int offset = skininfo->skins[j].offset;
 
-			if (!mesh->textures[offset].components[SKIN_DIFFUSE])
+			if (!mesh->skins[offset].components[SKIN_DIFFUSE])
 			{
 				printf("Model has missing skin.\n");
 				model_free(model);
 				return false;
 			}
 
-			if (skinwidth && skinheight && (skinwidth != mesh->textures[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->textures[offset].components[SKIN_DIFFUSE]->height))
+			if (skinwidth && skinheight && (skinwidth != mesh->skins[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->skins[offset].components[SKIN_DIFFUSE]->height))
 			{
 				printf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size.\n");
 				model_free(model);
 				return false;
 			}
-			skinwidth = mesh->textures[offset].components[SKIN_DIFFUSE]->width;
-			skinheight = mesh->textures[offset].components[SKIN_DIFFUSE]->height;
+			skinwidth = mesh->skins[offset].components[SKIN_DIFFUSE]->width;
+			skinheight = mesh->skins[offset].components[SKIN_DIFFUSE]->height;
 
 		/* if fullbright texture is a different size, resample it to match the diffuse texture */
-			if (mesh->textures[offset].components[SKIN_FULLBRIGHT] && (mesh->textures[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->textures[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
+			if (mesh->skins[offset].components[SKIN_FULLBRIGHT] && (mesh->skins[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->skins[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
 			{
-				image_rgba_t *image = image_resize(mesh->textures[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
-				image_free(&mesh->textures[offset].components[SKIN_FULLBRIGHT]);
-				mesh->textures[offset].components[SKIN_FULLBRIGHT] = image;
+				image_rgba_t *image = image_resize(mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_free(&mesh->skins[offset].components[SKIN_FULLBRIGHT]);
+				mesh->skins[offset].components[SKIN_FULLBRIGHT] = image;
 			}
 		}
 	}
@@ -652,7 +652,7 @@ bool_t model_mdl_save(const model_t *orig_model, void **out_data, size_t *out_si
 		{
 			int offset = skininfo->skins[j].offset;
 
-			skinimages[offset] = image_palettize(&quakepalette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+			skinimages[offset] = image_palettize(&quakepalette, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 		}
 	}
 

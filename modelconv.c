@@ -93,9 +93,9 @@ bool_t replacetexture(const char *filename)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
-		mesh->textures[0].components[SKIN_DIFFUSE] = image_clone(image);
-		mesh->textures[0].components[SKIN_FULLBRIGHT] = NULL;
+		mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t));
+		mesh->skins[0].components[SKIN_DIFFUSE] = image_clone(image);
+		mesh->skins[0].components[SKIN_FULLBRIGHT] = NULL;
 	}
 
 	image_free(&image);
@@ -421,10 +421,10 @@ int main(int argc, char **argv)
 			{
 				for (k = 0; k < SKIN_NUMTYPES; k++)
 				{
-					if (mesh->textures[j].components[k])
+					if (mesh->skins[j].components[k])
 					{
-						image_rgba_t *oldimage = mesh->textures[j].components[k];
-						mesh->textures[j].components[k] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
+						image_rgba_t *oldimage = mesh->skins[j].components[k];
+						mesh->skins[j].components[k] = image_resize(oldimage, (texwidth > 0) ? texwidth : oldimage->width, (texheight > 0) ? texheight : oldimage->height);
 						image_free(&oldimage);
 					}
 				}

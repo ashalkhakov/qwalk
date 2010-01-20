@@ -339,7 +339,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}*/
 
 	/* load skin */
-		mesh->textures = NULL;
+		mesh->skins = NULL;
 
 		f += md3_mesh->lump_end;
 	}

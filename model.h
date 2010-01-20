@@ -66,10 +66,10 @@ typedef enum skintype_e
 	SKIN_NUMTYPES
 } skintype_t;
 
-typedef struct texture_s
+typedef struct meshskin_s
 {
 	image_rgba_t *components[SKIN_NUMTYPES];
-} texture_t;
+} meshskin_t;
 
 typedef struct mesh_s
 {
@@ -84,7 +84,7 @@ typedef struct mesh_s
 
 	int *triangle3i;
 
-	texture_t *textures; /* [model.total_skins] */
+	meshskin_t *skins; /* [model.total_skins] */
 
 	struct
 	{
@@ -92,7 +92,7 @@ typedef struct mesh_s
 
 	/* the texture may need to be padded to power-of-two dimensions to be rendered, so we need extra texturing information */
 	/* each texture layer might be a different size, so we may have multiple sets of differently-padded texcoords... */
-		struct renderdata_texture
+		struct renderdata_skin
 		{
 			struct
 			{
@@ -100,7 +100,7 @@ typedef struct mesh_s
 				image_rgba_t *image;
 				unsigned int handle;
 			} components[SKIN_NUMTYPES];
-		} *textures; /* [model.total_skins] */
+		} *skins; /* [model.total_skins] */
 	} renderdata;
 } mesh_t;
 

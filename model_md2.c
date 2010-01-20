@@ -268,7 +268,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	mesh->name = copystring("md2mesh");
 
-	mesh->textures = (texture_t*)qmalloc(sizeof(texture_t) * model.num_skins);
+	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.num_skins);
 	for (i = 0; i < model.num_skins; i++)
 	{
 		void *filedata;
@@ -277,7 +277,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		image_rgba_t *image;
 
 		for (j = 0; j < SKIN_NUMTYPES; j++)
-			mesh->textures[i].components[j] = NULL;
+			mesh->skins[i].components[j] = NULL;
 
 	/* try to load the image file mentioned in the md2 */
 	/* if any of the skins fail to load, they will be left as null */
@@ -299,7 +299,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		qfree(filedata);
 
-		mesh->textures[i].components[SKIN_DIFFUSE] = image;
+		mesh->skins[i].components[SKIN_DIFFUSE] = image;
 	}
 
 	mesh->num_triangles = header->num_tris;
@@ -783,28 +783,28 @@ bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_si
 		{
 			int offset = skininfo->skins[j].offset;
 
-			if (!mesh->textures[offset].components[SKIN_DIFFUSE])
+			if (!mesh->skins[offset].components[SKIN_DIFFUSE])
 			{
 				printf("Model has missing skin.\n");
 				model_free(model);
 				return false;
 			}
 
-			if (skinwidth && skinheight && (skinwidth != mesh->textures[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->textures[offset].components[SKIN_DIFFUSE]->height))
+			if (skinwidth && skinheight && (skinwidth != mesh->skins[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->skins[offset].components[SKIN_DIFFUSE]->height))
 			{
 				printf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size.\n");
 				model_free(model);
 				return false;
 			}
-			skinwidth = mesh->textures[offset].components[SKIN_DIFFUSE]->width;
-			skinheight = mesh->textures[offset].components[SKIN_DIFFUSE]->height;
+			skinwidth = mesh->skins[offset].components[SKIN_DIFFUSE]->width;
+			skinheight = mesh->skins[offset].components[SKIN_DIFFUSE]->height;
 
 		/* if fullbright texture is a different size, resample it to match the diffuse texture */
-			if (mesh->textures[offset].components[SKIN_FULLBRIGHT] && (mesh->textures[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->textures[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
+			if (mesh->skins[offset].components[SKIN_FULLBRIGHT] && (mesh->skins[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->skins[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
 			{
-				image_rgba_t *image = image_resize(mesh->textures[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
-				image_free(&mesh->textures[offset].components[SKIN_FULLBRIGHT]);
-				mesh->textures[offset].components[SKIN_FULLBRIGHT] = image;
+				image_rgba_t *image = image_resize(mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_free(&mesh->skins[offset].components[SKIN_FULLBRIGHT]);
+				mesh->skins[offset].components[SKIN_FULLBRIGHT] = image;
 			}
 		}
 	}
@@ -829,7 +829,7 @@ bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_si
 
 		offset = model->skininfo[i].skins[0].offset; /* skingroups not supported */
 
-		pimage = image_palettize(&quake2palette, mesh->textures[offset].components[SKIN_DIFFUSE], mesh->textures[offset].components[SKIN_FULLBRIGHT]);
+		pimage = image_palettize(&quake2palette, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 
 		imagesize = image_pcx_save(pimage, data, 16*1024*1024);
 		if (!imagesize)

@@ -208,11 +208,11 @@ void r_init(void)
 		{
 			for (k = 0; k < SKIN_NUMTYPES; k++)
 			{
-				if (mesh->renderdata.textures[j].components[k].image)
+				if (mesh->renderdata.skins[j].components[k].image)
 				{
-					glGenTextures(1, &mesh->renderdata.textures[j].components[k].handle); CHECKGLERROR();
-					glBindTexture(GL_TEXTURE_2D, mesh->renderdata.textures[j].components[k].handle); CHECKGLERROR();
-					glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.textures[j].components[k].image->width, mesh->renderdata.textures[j].components[k].image->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.textures[j].components[k].image->pixels); CHECKGLERROR();
+					glGenTextures(1, &mesh->renderdata.skins[j].components[k].handle); CHECKGLERROR();
+					glBindTexture(GL_TEXTURE_2D, mesh->renderdata.skins[j].components[k].handle); CHECKGLERROR();
+					glTexImage2D(GL_TEXTURE_2D, 0, 4, mesh->renderdata.skins[j].components[k].image->width, mesh->renderdata.skins[j].components[k].image->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->renderdata.skins[j].components[k].image->pixels); CHECKGLERROR();
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texturefiltering ? GL_LINEAR : GL_NEAREST); CHECKGLERROR();
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECKGLERROR();
@@ -549,10 +549,10 @@ void render(void)
 			int sframe = (int)(anim_progress / skininfo->frametime) % skininfo->num_skins;
 			int skinoffset = skininfo->skins[sframe].offset;
 
-			diffuse_handle = mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].handle;
-			fullbright_handle = mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].handle;
-			diffuse_texcoord2f = mesh->renderdata.textures[skinoffset].components[SKIN_DIFFUSE].texcoord2f;
-			fullbright_texcoord2f = mesh->renderdata.textures[skinoffset].components[SKIN_FULLBRIGHT].texcoord2f;
+			diffuse_handle = mesh->renderdata.skins[skinoffset].components[SKIN_DIFFUSE].handle;
+			fullbright_handle = mesh->renderdata.skins[skinoffset].components[SKIN_FULLBRIGHT].handle;
+			diffuse_texcoord2f = mesh->renderdata.skins[skinoffset].components[SKIN_DIFFUSE].texcoord2f;
+			fullbright_texcoord2f = mesh->renderdata.skins[skinoffset].components[SKIN_FULLBRIGHT].texcoord2f;
 		}
 
 		animate_mesh(mesh);
@@ -751,9 +751,9 @@ bool_t replacetexture(const char *filename)
 
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
-		mesh->textures = (texture_t*)qmalloc(sizeof(texture_t));
-		mesh->textures[0].components[SKIN_DIFFUSE] = image_clone(image);
-		mesh->textures[0].components[SKIN_FULLBRIGHT] = NULL;
+		mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t));
+		mesh->skins[0].components[SKIN_DIFFUSE] = image_clone(image);
+		mesh->skins[0].components[SKIN_FULLBRIGHT] = NULL;
 	}
 
 	image_free(&image);
@@ -769,20 +769,23 @@ void vandalize_skin(void)
 	{
 		for (j = 0; j < model->total_skins; j++)
 		{
-			image_rgba_t *image = mesh->textures[j].components[SKIN_DIFFUSE];
+			image_rgba_t *image = mesh->skins[j].components[SKIN_DIFFUSE];
 
-			for (k = 0; k < mesh->num_triangles; k++)
+			if (image)
 			{
-				int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+0]*2+0] * image->width);
-				int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+0]*2+1] * image->height);
-				int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+1]*2+0] * image->width);
-				int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+1]*2+1] * image->height);
-				int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+2]*2+0] * image->width);
-				int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+2]*2+1] * image->height);
+				for (k = 0; k < mesh->num_triangles; k++)
+				{
+					int s0 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+0]*2+0] * image->width);
+					int t0 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+0]*2+1] * image->height);
+					int s1 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+1]*2+0] * image->width);
+					int t1 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+1]*2+1] * image->height);
+					int s2 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+2]*2+0] * image->width);
+					int t2 = (int)(mesh->texcoord2f[mesh->triangle3i[k*3+2]*2+1] * image->height);
 
-				image_drawline(image, s0, t0, s1, t1, 255, 255, 255);
-				image_drawline(image, s1, t1, s2, t2, 255, 255, 255);
-				image_drawline(image, s2, t2, s0, t2, 255, 255, 255);
+					image_drawline(image, s0, t0, s1, t1, 255, 255, 255);
+					image_drawline(image, s1, t1, s2, t2, 255, 255, 255);
+					image_drawline(image, s2, t2, s0, t2, 255, 255, 255);
+				}
 			}
 		}
 	}
