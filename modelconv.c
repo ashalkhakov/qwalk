@@ -242,6 +242,7 @@ void dump_txt(const char *filename, const model_t *model)
 
 int main(int argc, char **argv)
 {
+	bool_t notex = false;
 	int flags = 0;
 	int synctype = 0;
 	float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
@@ -263,6 +264,10 @@ int main(int argc, char **argv)
 				}
 
 				strcpy(infilename, argv[i]);
+			}
+			else if (!strcmp(argv[i], "-notex"))
+			{
+				notex = true;
 			}
 			else if (!strcmp(argv[i], "-tex"))
 			{
@@ -391,6 +396,11 @@ int main(int argc, char **argv)
 	model->offsets[0] = offsets_x;
 	model->offsets[1] = offsets_y;
 	model->offsets[2] = offsets_z;
+
+	if (notex)
+	{
+		model_clear_skins(model);
+	}
 
 	if (texfilename[0])
 	{
