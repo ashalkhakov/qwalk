@@ -237,10 +237,10 @@ void drawstring(int x, int y, const char *s)
 	{
 		if (*s > 32)
 		{
-			glTexCoord2fv(font_texcoords[*s]+0); glVertex2i(x                 , y                  );
-			glTexCoord2fv(font_texcoords[*s]+2); glVertex2i(x + font_charwidth, y                  );
-			glTexCoord2fv(font_texcoords[*s]+4); glVertex2i(x + font_charwidth, y + font_charheight);
-			glTexCoord2fv(font_texcoords[*s]+6); glVertex2i(x                 , y + font_charheight);
+			glTexCoord2fv(font_texcoords[(int)*s]+0); glVertex2i(x                 , y                  );
+			glTexCoord2fv(font_texcoords[(int)*s]+2); glVertex2i(x + font_charwidth, y                  );
+			glTexCoord2fv(font_texcoords[(int)*s]+4); glVertex2i(x + font_charwidth, y + font_charheight);
+			glTexCoord2fv(font_texcoords[(int)*s]+6); glVertex2i(x                 , y + font_charheight);
 		}
 	}
 	glEnd();
