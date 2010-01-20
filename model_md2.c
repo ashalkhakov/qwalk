@@ -23,6 +23,7 @@
 #include "model.h"
 
 extern int texwidth, texheight;
+extern const char *g_skinpath;
 
 extern const float anorms[162][3];
 int compress_normal(const float *normal);
@@ -378,12 +379,22 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 static char *md2_create_skin_filename(const char *skinname)
 {
-	const char *ext = strrchr(skinname, '.');
+	char temp[1024];
+	char *c;
 
-	if (ext && !strcasecmp(ext, ".pcx"))
-		return copystring(skinname);
+/* in case skinname is already a file path, strip path and extension (so "models/something/skin.pcx" becomes "skin") */
+	if ((c = strrchr(skinname, '/')))
+		strcpy(temp, c + 1);
 	else
-		return msprintf("%s.pcx", skinname);
+		strcpy(temp, skinname);
+
+	if ((c = strchr(temp, '.')))
+		*c = '\0';
+
+	if (g_skinpath && g_skinpath[0])
+		return msprintf("%s/%s.pcx", g_skinpath, temp);
+	else
+		return msprintf("%s.pcx", temp);
 }
 
 typedef struct md2_data_s

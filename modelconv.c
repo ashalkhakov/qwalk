@@ -22,13 +22,10 @@
 #include "global.h"
 #include "model.h"
 
-static char infilename[1024] = {0};
-static char outfilename[1024] = {0};
-
-static char texfilename[1024] = {0};
-
 int texwidth = -1;
 int texheight = -1;
+
+const char *g_skinpath = NULL;
 
 static model_t *model = NULL;
 
@@ -141,7 +138,7 @@ void dump_txt(const char *filename, const model_t *model)
 		return;
 	}
 
-	fprintf(fp, "Analysis of %s\n\n", infilename);
+	fprintf(fp, "Analysis of %s\n\n", filename);
 
 	fprintf(fp, "total_frames = %d\n", model->total_frames);
 	fprintf(fp, "num_frames = %d\n", model->num_frames);
@@ -242,6 +239,10 @@ void dump_txt(const char *filename, const model_t *model)
 
 int main(int argc, char **argv)
 {
+	char infilename[1024] = {0};
+	char outfilename[1024] = {0};
+	char texfilename[1024] = {0};
+	char skinpath[1024] = {0};
 	bool_t notex = false;
 	int flags = 0;
 	int synctype = 0;
@@ -263,7 +264,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strcpy(infilename, argv[i]);
+				strlcpy(infilename, argv[i], sizeof(infilename));
 			}
 			else if (!strcmp(argv[i], "-notex"))
 			{
@@ -277,7 +278,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strcpy(texfilename, argv[i]);
+				strlcpy(texfilename, argv[i], sizeof(texfilename));
 			}
 			else if (!strcmp(argv[i], "-texwidth"))
 			{
@@ -310,6 +311,28 @@ int main(int argc, char **argv)
 					printf("%s: invalid value for option '-texheight'\n", argv[0]);
 					return 0;
 				}
+			}
+			else if (!strcmp(argv[i], "-skinpath"))
+			{
+				char *error;
+
+				if (++i == argc)
+				{
+					printf("%s: missing argument for options '-skinpath'\n", argv[0]);
+					return 0;
+				}
+
+				strlcpy(skinpath, argv[i], sizeof(skinpath));
+
+			/* parse the path, create missing directories, and normalize the path syntax to something like "folder/folder/folder" */
+				if (!makepath(skinpath, &error))
+				{
+					printf("failed to make skin path: %s\n", error);
+					qfree(error);
+					return 0;
+				}
+
+				g_skinpath = skinpath;
 			}
 			else if (!strcmp(argv[i], "-flags"))
 			{
@@ -377,7 +400,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			strcpy(outfilename, argv[i]);
+			strlcpy(outfilename, argv[i], sizeof(outfilename));
 		}
 	}
 

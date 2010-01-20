@@ -15,13 +15,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifdef WIN32
 # include <windows.h>
+# include <direct.h>
 #else
 # include <unistd.h>
 # include <fcntl.h>
@@ -110,6 +113,90 @@ bool_t yesno(void)
 	fgets(buffer, sizeof(buffer), stdin);
 
 	return (buffer[0] == 'y' || buffer[0] == 'Y') && (!buffer[1] || buffer[1] == '\r' || buffer[1] == '\n');
+}
+
+/* sorry about this nightmare! */
+/* modifies the input string to contain the properly formatted path */
+bool_t makepath(char *path, char **out_error)
+{
+	char *s;
+	char *dirname, *dn;
+	char *newpath;
+	struct stat st;
+
+/* parse the path into directories */
+	newpath = (char*)qmalloc(strlen(path) + 1);
+	newpath[0] = '\0';
+
+	dirname = (char*)qmalloc(strlen(path) + 1);
+	dn = dirname;
+
+#define FAIL(err) \
+	{ \
+		if (out_error) \
+			*out_error = err; \
+		qfree(dirname); \
+		qfree(newpath); \
+		return false; \
+	}
+
+	for (s = path; ; s++)
+	{
+		if (*s == '/' || *s == '\\' || !*s)
+		{
+			*dn = '\0';
+			if (dirname[0])
+			{
+				if (newpath[0])
+					strcat(newpath, "/");
+				strcat(newpath, dirname);
+
+			/* does this directory already exist? */
+				if (stat(newpath, &st) != 0)
+				{
+					if (errno != ENOENT)
+						FAIL(msprintf("%s: %s", newpath, strerror(errno)))
+
+				/* file doesn't exist */
+					printf("directory %s doesn't exist. Create it? [y/N] ", newpath);
+					if (!yesno())
+						FAIL(copystring("user aborted operation"))
+
+				/* create the directory */
+#ifdef WIN32
+					if (_mkdir(newpath) != 0)
+#else
+					if (mkdir(newpath, 0777) != 0)
+#endif
+						FAIL(msprintf("%s: %s", newpath, strerror(errno)))
+				}
+				else
+				{
+				/* file exists. is it a file or a directory? */
+					if ((st.st_mode & S_IFMT) != S_IFDIR)
+						FAIL(msprintf("%s is not a directory", newpath))
+				/* else, it's a directory which already exists, which is good */
+				}
+			}
+			else if (!newpath[0] && *s)
+				FAIL(msprintf("can't begin path with slash"))
+			dn = dirname;
+
+			if (!*s)
+				break;
+		}
+		else
+		{
+			*dn++ = *s;
+		}
+	}
+
+#undef FAIL
+
+	qfree(dirname);
+	strcpy(path, newpath);
+	qfree(newpath);
+	return true;
 }
 
 bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **out_error)

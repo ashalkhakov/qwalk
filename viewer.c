@@ -33,8 +33,9 @@ extern void loadfont(void);
 extern void freefont(void);
 extern void drawstringf(int x, int y, const char *s, ...);
 
-int texwidth = -1; /* unused by viewer but needed by model_md2.c */
+int texwidth = -1; /* unused by viewer but needed by md2 exporter */
 int texheight = -1;
+const char *g_skinpath = NULL;
 
 int vid_width = -1;
 int vid_height = -1;
@@ -833,7 +834,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strcpy(texfilename, argv[i]);
+				strlcpy(texfilename, argv[i], sizeof(texfilename));
 			}
 			else if (!strcmp(argv[i], "-width"))
 			{
@@ -923,7 +924,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			strcpy(infilename, argv[i]);
+			strlcpy(infilename, argv[i], sizeof(infilename));
 		}
 	}
 

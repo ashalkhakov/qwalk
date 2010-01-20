@@ -69,6 +69,7 @@ void strlcpy(char *dest, const char *src, size_t size);
 # define strncasecmp _strnicmp
 #endif
 
+bool_t makepath(char *path, char **out_error);
 bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **out_error);
 bool_t writefile(const char *filename, const void *data, size_t size, char **out_error);
 
