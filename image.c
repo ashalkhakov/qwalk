@@ -110,7 +110,7 @@ static unsigned char palettize_colour(const palette_t *palette, bool_t fullbrigh
 		if (fullbright != !!(palette->fullbright_flags[i >> 5] & (1U << (i & 31))))
 			continue;
 
-		dist = abs(palette->rgb[i*3+0] - rgb[0]) + abs(palette->rgb[i*3+1] - rgb[1]) + abs(palette->rgb[i*3+2] - rgb[2]);
+		dist = 299 * abs(palette->rgb[i*3+0] - rgb[0]) + 587 * abs(palette->rgb[i*3+1] - rgb[1]) + 114 * abs(palette->rgb[i*3+2] - rgb[2]);
 
 		if (besti == -1 || dist < bestdist)
 		{
