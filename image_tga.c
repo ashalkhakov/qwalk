@@ -434,28 +434,30 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 	return image;
 }
 
-size_t image_tga_save(const image_rgba_t *image, void *filedata, size_t filesize)
+bool_t image_tga_save(const image_rgba_t *image, xbuf_t *xbuf, char **out_error)
 {
 	bool_t hasalpha;
-	unsigned char *f = (unsigned char*)filedata;
+	unsigned char header[18];
 	int x, y, i;
 	int runlen;
 
+/* see if the TGA should contain an alpha channel */
 	hasalpha = false;
 	for (i = 0; i < image->width * image->height; i++)
 		if (image->pixels[i*4+3] != 0xff)
 			hasalpha = true;
 
-	memset(f, 0, 18);
-	f[2] = 10; /* compressed BGR(A) */
-	f[12] = image->width & 0xff;
-	f[13] = (image->width >> 8) & 0xff;
-	f[14] = image->height & 0xff;
-	f[15] = (image->height >> 8) & 0xff;
-	f[16] = hasalpha ? 32 : 24;
-	f[17] = hasalpha ? 8 : 0;
+/* write header */
+	memset(header, 0, 18);
+	header[2] = 10; /* compressed BGR(A) */
+	header[12] = image->width & 0xff;
+	header[13] = (image->width >> 8) & 0xff;
+	header[14] = image->height & 0xff;
+	header[15] = (image->height >> 8) & 0xff;
+	header[16] = hasalpha ? 32 : 24;
+	header[17] = hasalpha ? 8 : 0;
 
-	f += 18;
+	xbuf_write_data(xbuf, 18, header);
 
 /* don't let runs span multiple lines, because apparently that's against the specs */
 	for (y = 0; y < image->height; y++)
@@ -478,29 +480,30 @@ size_t image_tga_save(const image_rgba_t *image, void *filedata, size_t filesize
 				if (runlen > 1)
 					runlen--; /* chop the last one off, since it's the beginning of a new run */
 
-				*f++ = runlen - 1;
+				xbuf_write_byte(xbuf, runlen - 1);
 
 				for (i = x; i < x + runlen; i++)
 				{
-					*f++ = pix[i*4+2];
-					*f++ = pix[i*4+1];
-					*f++ = pix[i*4+0];
+					xbuf_write_byte(xbuf, pix[i*4+2]);
+					xbuf_write_byte(xbuf, pix[i*4+1]);
+					xbuf_write_byte(xbuf, pix[i*4+0]);
 					if (hasalpha)
-						*f++ = pix[i*4+3];
+						xbuf_write_byte(xbuf, pix[i*4+3]);
 				}
 			}
 			else
 			{
-				*f++ = 0x80 | (runlen - 1);
+				xbuf_write_byte(xbuf, 0x80 | (runlen - 1));
 
-				*f++ = pix[x*4+2];
-				*f++ = pix[x*4+1];
-				*f++ = pix[x*4+0];
+				xbuf_write_byte(xbuf, pix[x*4+2]);
+				xbuf_write_byte(xbuf, pix[x*4+1]);
+				xbuf_write_byte(xbuf, pix[x*4+0]);
 				if (hasalpha)
-					*f++ = pix[x*4+3];
+					xbuf_write_byte(xbuf, pix[x*4+3]);
 			}
 		}
 	}
 
-	return f - (unsigned char*)filedata;
+/* done */
+	return true;
 }

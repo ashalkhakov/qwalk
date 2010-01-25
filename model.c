@@ -15,11 +15,41 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "global.h"
 #include "model.h"
+
+typedef struct model_format_s
+{
+	const char *name;
+	const char *file_extension;
+
+	bool_t (*load)(void *filedata, size_t filesize, model_t *out_model, char **out_error);
+	bool_t (*save)(const model_t *model, xbuf_t *xbuf, char **out_error);
+} model_format_t;
+
+static model_format_t model_formats[] =
+{
+	{ "MDL", ".mdl", model_mdl_load, model_mdl_save },
+	{ "MD2", ".md2", model_md2_load, model_md2_save },
+	{ "MD3", ".md3", model_md3_load, NULL }
+};
+
+static const model_format_t *get_model_format(const char *filename)
+{
+	const char *ext = strrchr(filename, '.');
+	int i;
+
+	if (ext)
+		for (i = 0; i < sizeof(model_formats) / sizeof(model_formats[0]); i++)
+			if (!strcasecmp(ext, model_formats[i].file_extension))
+				return &model_formats[i];
+
+	return NULL;
+}
 
 void mesh_initialize(model_t *model, mesh_t *mesh)
 {
@@ -192,26 +222,69 @@ void model_clear_skins(model_t *model)
 
 bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
-/* FIXME - check the file header, not the filename extension */
-	const char *ext = strrchr(filename, '.');
+	const model_format_t *format = get_model_format(filename);
 
-	if (!ext)
+	if (!format)
+		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+	if (!format->load)
+		return (out_error && (*out_error = msprintf("loading not implemented for %s format", format->name))), false;
+
+	return (*format->load)(filedata, filesize, out_model, out_error);
+}
+
+model_t *model_load_from_file(const char *filename, char **out_error)
+{
+	void *filedata;
+	size_t filesize;
+	model_t *model;
+
+	if (!loadfile(filename, &filedata, &filesize, out_error))
+		return NULL;
+
+	model = (model_t*)qmalloc(sizeof(model_t));
+
+	if (!model_load(filename, filedata, filesize, model, out_error))
 	{
-		if (out_error)
-			*out_error = msprintf("no file extension");
+		qfree(model);
+		qfree(filedata);
+		return NULL;
+	}
+
+	qfree(filedata);
+	return model;
+}
+
+bool_t model_save(const char *filename, const model_t *model, char **out_error)
+{
+	const model_format_t *format = get_model_format(filename);
+	xbuf_t *xbuf;
+
+	if (!format)
+		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+	if (!format->save)
+		return (out_error && (*out_error = msprintf("saving not implemented for %s format", format->name))), false;
+
+/* allocate write buffer, use a memory buffer because we need to be able to rewind at times (not supported with file buffers) */
+	xbuf = xbuf_create_memory(262144, out_error);
+	if (!xbuf)
+		return false;
+
+/* write the model data into the buffer */
+	if (!(*format->save)(model, xbuf, out_error))
+	{
+		xbuf_free(xbuf, NULL);
 		return false;
 	}
 
-	if (!strcasecmp(ext, ".mdl"))
-		return model_mdl_load(filedata, filesize, out_model, out_error);
-	if (!strcasecmp(ext, ".md2"))
-		return model_md2_load(filedata, filesize, out_model, out_error);
-	if (!strcasecmp(ext, ".md3"))
-		return model_md3_load(filedata, filesize, out_model, out_error);
+/* save buffer contents to file */
+	if (!xbuf_write_to_file(xbuf, filename, out_error))
+	{
+		xbuf_free(xbuf, NULL);
+		return false;
+	}
 
-	if (out_error)
-		*out_error = msprintf("unrecognized file extension");
-	return false;
+	xbuf_free(xbuf, NULL);
+	return true;
 }
 
 void model_generaterenderdata(model_t *model)
@@ -405,4 +478,78 @@ model_t *model_merge_meshes(const model_t *model)
 			newmesh->skins[i].components[j] = image_clone(model->meshes[0].skins[i].components[j]);
 
 	return newmodel;
+}
+
+void model_facetize(model_t *model)
+{
+	int i, j, k, f;
+	mesh_t *mesh;
+
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
+	{
+		float *vertex3f = (float*)qmalloc(model->total_frames * sizeof(float[3]) * mesh->num_triangles * 3);
+		float *normal3f = (float*)qmalloc(model->total_frames * sizeof(float[3]) * mesh->num_triangles * 3);
+		float *texcoord2f = (float*)qmalloc(sizeof(float[2]) * mesh->num_triangles * 3);
+		float *tc = texcoord2f;
+
+		for (j = 0; j < mesh->num_triangles; j++)
+		{
+			for (f = 0; f < model->total_frames; f++)
+			{
+				const float *mvs = mesh->vertex3f + f * mesh->num_vertices * 3;
+				const float *mns = mesh->normal3f + f * mesh->num_vertices * 3;
+				float *a, *b, *c, q[3], v[3], normal[3];
+
+				for (k = 0; k < 3; k++)
+				{
+					int vertindex = mesh->triangle3i[j * 3 + k];
+
+					float *v = vertex3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + k) * 3;
+					float *n = normal3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + k) * 3;
+
+					VectorCopy(v, mvs + vertindex * 3);
+					VectorCopy(n, mns + vertindex * 3);
+				}
+
+				c = vertex3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 0) * 3;
+				b = vertex3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 1) * 3;
+				a = vertex3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 2) * 3;
+
+				VectorSubtract(b, c, q);
+				VectorSubtract(b, a, v);
+				CrossProduct(q, v, normal);
+				VectorNormalize(normal);
+
+				c = normal3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 0) * 3;
+				b = normal3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 1) * 3;
+				a = normal3f + f * (mesh->num_triangles * 3) * 3 + (j * 3 + 2) * 3;
+
+				VectorCopy(a, normal);
+				VectorCopy(b, normal);
+				VectorCopy(c, normal);
+			}
+
+			for (k = 0; k < 3; k++)
+			{
+				int vertindex = mesh->triangle3i[j * 3 + k];
+
+				tc[0] = mesh->texcoord2f[vertindex*2+0];
+				tc[1] = mesh->texcoord2f[vertindex*2+1];
+
+				tc += 2;
+			}
+
+			mesh->triangle3i[j * 3 + 0] = j * 3 + 0;
+			mesh->triangle3i[j * 3 + 1] = j * 3 + 1;
+			mesh->triangle3i[j * 3 + 2] = j * 3 + 2;
+		}
+
+		qfree(mesh->vertex3f);
+		qfree(mesh->normal3f);
+		qfree(mesh->texcoord2f);
+		mesh->vertex3f = vertex3f;
+		mesh->normal3f = normal3f;
+		mesh->texcoord2f = texcoord2f;
+		mesh->num_vertices = mesh->num_triangles * 3;
+	}
 }

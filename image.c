@@ -21,27 +21,134 @@
 #include "global.h"
 #include "image.h"
 
-image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error)
+typedef enum image_format_e
+{
+	IMGFMT_MISSING,
+	IMGFMT_UNRECOGNIZED,
+	IMGFMT_PCX,
+	IMGFMT_TGA,
+	IMGFMT_JPG
+} image_format_t;
+
+static image_format_t get_image_format(const char *filename)
 {
 	const char *ext = strrchr(filename, '.');
 
 	if (!ext)
-	{
-		if (out_error)
-			*out_error = msprintf("%s: no file extension", filename);
-		return NULL;
-	}
+		return IMGFMT_MISSING;
 
 	if (!strcasecmp(ext, ".pcx"))
-		return image_pcx_load(filedata, filesize, out_error);
+		return IMGFMT_PCX;
 	if (!strcasecmp(ext, ".tga"))
-		return image_tga_load(filedata, filesize, out_error);
+		return IMGFMT_TGA;
 	if (!strcasecmp(ext, ".jpg") || !strcasecmp(ext, ".jpeg"))
-		return image_jpeg_load(filedata, filesize, out_error);
+		return IMGFMT_JPG;
 
-	if (out_error)
-		*out_error = msprintf("unrecognized file extension \"%s\"", ext);
-	return NULL;
+	return IMGFMT_UNRECOGNIZED;
+}
+
+image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error)
+{
+	switch (get_image_format(filename))
+	{
+	default:
+	case IMGFMT_MISSING:
+		return (out_error && (*out_error = msprintf("missing file extension"))), NULL;
+	case IMGFMT_UNRECOGNIZED:
+		return (out_error && (*out_error = msprintf("unrecognized file extension"))), NULL;
+	case IMGFMT_PCX: return image_pcx_load(filedata, filesize, out_error);
+	case IMGFMT_TGA: return image_tga_load(filedata, filesize, out_error);
+	case IMGFMT_JPG: return image_jpg_load(filedata, filesize, out_error);
+	}
+}
+
+image_rgba_t *image_load_from_file(const char *filename, char **out_error)
+{
+	void *filedata;
+	size_t filesize;
+	image_rgba_t *image;
+
+	if (!loadfile(filename, &filedata, &filesize, out_error))
+		return NULL;
+
+	image = image_load(filename, filedata, filesize, out_error);
+
+	qfree(filedata);
+	return image;
+}
+
+bool_t image_save(const char *filename, const image_rgba_t *image, char **out_error)
+{
+	bool_t (*savefunc)(const image_rgba_t *image, xbuf_t *xbuf, char **out_error) = NULL;
+	xbuf_t *xbuf;
+
+	switch (get_image_format(filename))
+	{
+	default:
+	case IMGFMT_MISSING:
+		return (out_error && (*out_error = msprintf("missing file extension"))), false;
+	case IMGFMT_UNRECOGNIZED:
+		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+	case IMGFMT_PCX:
+		return (out_error && (*out_error = msprintf("cannot save 32-bit image to PCX"))), false;
+	case IMGFMT_TGA:
+		savefunc = image_tga_save;
+		break;
+	case IMGFMT_JPG:
+		return (out_error && (*out_error = msprintf("jpeg saving not implemented"))), false; /* FIXME - so implement it! */
+	}
+
+/* allocate write buffer and set it up to flush directly to the file */
+	xbuf = xbuf_create_file(262144, filename, out_error);
+	if (!xbuf)
+		return false;
+
+/* write image data */
+	if (!(*savefunc)(image, xbuf, out_error))
+	{
+		xbuf_free(xbuf, NULL);
+		return false;
+	}
+
+/* flush any remaining data to file and free the buffer */
+	return xbuf_finish_file(xbuf, out_error);
+}
+
+bool_t image_paletted_save(const char *filename, const image_paletted_t *image, char **out_error)
+{
+	bool_t (*savefunc)(const image_paletted_t *image, xbuf_t *xbuf, char **out_error) = NULL;
+	xbuf_t *xbuf;
+
+	switch (get_image_format(filename))
+	{
+	default:
+	case IMGFMT_MISSING:
+		return (out_error && (*out_error = msprintf("missing file extension"))), false;
+	case IMGFMT_UNRECOGNIZED:
+		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+	case IMGFMT_PCX:
+		savefunc = image_pcx_save;
+		break;
+	case IMGFMT_TGA:
+		return (out_error && (*out_error = msprintf("cannot save 8-bit image to TGA"))), false;
+	case IMGFMT_JPG:
+		return (out_error && (*out_error = msprintf("cannot save 8-bit image to JPEG"))), false;
+	}
+
+/* allocate write buffer and set it up to flush directly to the file */
+	xbuf = xbuf_create_file(262144, filename, out_error);
+	if (!xbuf)
+		return false;
+
+/* write image data */
+	if (!(*savefunc)(image, xbuf, out_error))
+	{
+		xbuf_free(xbuf, NULL);
+		return false;
+	}
+
+/* flush any remaining data to file and free the buffer */
+	return xbuf_finish_file(xbuf, out_error);
 }
 
 image_rgba_t *image_alloc(int width, int height)

@@ -64,6 +64,7 @@
 				LinkIncremental="2"
 				IgnoreDefaultLibraryNames="msvcrt.lib"
 				GenerateDebugInformation="true"
+				GenerateMapFile="true"
 				SubSystem="1"
 				TargetMachine="1"
 			/>
@@ -138,6 +139,7 @@
 				LinkIncremental="1"
 				IgnoreDefaultLibraryNames=""
 				GenerateDebugInformation="true"
+				GenerateMapFile="true"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -219,6 +221,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\palettes.c"
+				>
+			</File>
+			<File
 				RelativePath=".\util.c"
 				>
 			</File>
@@ -242,6 +248,10 @@
 			</File>
 			<File
 				RelativePath=".\model.h"
+				>
+			</File>
+			<File
+				RelativePath=".\palettes.h"
 				>
 			</File>
 		</Filter>

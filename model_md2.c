@@ -21,6 +21,7 @@
 
 #include "global.h"
 #include "model.h"
+#include "palettes.h"
 
 extern int texwidth, texheight;
 extern const char *g_skinpath;
@@ -81,41 +82,37 @@ typedef struct daliasframe_s
 	float scale[3];
 	float translate[3];
 	char name[16];
-	dtrivertx_t verts[1];
+/*	dtrivertx_t verts[1];*/
 } daliasframe_t;
 
-static palette_t quake2palette =
+bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
+	typedef struct md2_meshvert_s
 	{
-		  0,  0,  0,  15, 15, 15,  31, 31, 31,  47, 47, 47,  63, 63, 63,  75, 75, 75,  91, 91, 91, 107,107,107, 123,123,123, 139,139,139, 155,155,155, 171,171,171, 187,187,187, 203,203,203, 219,219,219, 235,235,235,
-		 99, 75, 35,  91, 67, 31,  83, 63, 31,  79, 59, 27,  71, 55, 27,  63, 47, 23,  59, 43, 23,  51, 39, 19,  47, 35, 19,  43, 31, 19,  39, 27, 15,  35, 23, 15,  27, 19, 11,  23, 15, 11,  19, 15,  7,  15, 11,  7,
-		 95, 95,111,  91, 91,103,  91, 83, 95,  87, 79, 91,  83, 75, 83,  79, 71, 75,  71, 63, 67,  63, 59, 59,  59, 55, 55,  51, 47, 47,  47, 43, 43,  39, 39, 39,  35, 35, 35,  27, 27, 27,  23, 23, 23,  19, 19, 19,
-		143,119, 83, 123, 99, 67, 115, 91, 59, 103, 79, 47, 207,151, 75, 167,123, 59, 139,103, 47, 111, 83, 39, 235,159, 39, 203,139, 35, 175,119, 31, 147, 99, 27, 119, 79, 23,  91, 59, 15,  63, 39, 11,  35, 23,  7,
-		167, 59, 43, 159, 47, 35, 151, 43, 27, 139, 39, 19, 127, 31, 15, 115, 23, 11, 103, 23,  7,  87, 19,  0,  75, 15,  0,  67, 15,  0,  59, 15,  0,  51, 11,  0,  43, 11,  0,  35, 11,  0,  27,  7,  0,  19,  7,  0,
-		123, 95, 75, 115, 87, 67, 107, 83, 63, 103, 79, 59,  95, 71, 55,  87, 67, 51,  83, 63, 47,  75, 55, 43,  67, 51, 39,  63, 47, 35,  55, 39, 27,  47, 35, 23,  39, 27, 19,  31, 23, 15,  23, 15, 11,  15, 11,  7,
-		111, 59, 23,  95, 55, 23,  83, 47, 23,  67, 43, 23,  55, 35, 19,  39, 27, 15,  27, 19, 11,  15, 11,  7, 179, 91, 79, 191,123,111, 203,155,147, 215,187,183, 203,215,223, 179,199,211, 159,183,195, 135,167,183,
-		115,151,167,  91,135,155,  71,119,139,  47,103,127,  23, 83,111,  19, 75,103,  15, 67, 91,  11, 63, 83,   7, 55, 75,   7, 47, 63,   7, 39, 51,   0, 31, 43,   0, 23, 31,   0, 15, 19,   0,  7, 11,   0,  0,  0,
-		139, 87, 87, 131, 79, 79, 123, 71, 71, 115, 67, 67, 107, 59, 59,  99, 51, 51,  91, 47, 47,  87, 43, 43,  75, 35, 35,  63, 31, 31,  51, 27, 27,  43, 19, 19,  31, 15, 15,  19, 11, 11,  11,  7,  7,   0,  0,  0,
-		151,159,123, 143,151,115, 135,139,107, 127,131, 99, 119,123, 95, 115,115, 87, 107,107, 79,  99, 99, 71,  91, 91, 67,  79, 79, 59,  67, 67, 51,  55, 55, 43,  47, 47, 35,  35, 35, 27,  23, 23, 19,  15, 15, 11,
-		159, 75, 63, 147, 67, 55, 139, 59, 47, 127, 55, 39, 119, 47, 35, 107, 43, 27,  99, 35, 23,  87, 31, 19,  79, 27, 15,  67, 23, 11,  55, 19, 11,  43, 15,  7,  31, 11,  7,  23,  7,  0,  11,  0,  0,   0,  0,  0,
-		119,123,207, 111,115,195, 103,107,183,  99, 99,167,  91, 91,155,  83, 87,143,  75, 79,127,  71, 71,115,  63, 63,103,  55, 55, 87,  47, 47, 75,  39, 39, 63,  35, 31, 47,  27, 23, 35,  19, 15, 23,  11,  7,  7,
-		155,171,123, 143,159,111, 135,151, 99, 123,139, 87, 115,131, 75, 103,119, 67,  95,111, 59,  87,103, 51,  75, 91, 39,  63, 79, 27,  55, 67, 19,  47, 59, 11,  35, 47,  7,  27, 35,  0,  19, 23,  0,  11, 15,  0,
-		  0,255,  0,  35,231, 15,  63,211, 27,  83,187, 39,  95,167, 47,  95,143, 51,  95,123, 51, 255,255,255, 255,255,211, 255,255,167, 255,255,127, 255,255, 83, 255,255, 39, 255,235, 31, 255,215, 23, 255,191, 15,
-		255,171,  7, 255,147,  0, 239,127,  0, 227,107,  0, 211, 87,  0, 199, 71,  0, 183, 59,  0, 171, 43,  0, 155, 31,  0, 143, 23,  0, 127, 15,  0, 115,  7,  0,  95,  0,  0,  71,  0,  0,  47,  0,  0,  27,  0,  0,
-		239,  0,  0,  55, 55,255, 255,  0,  0,   0,  0,255,  43, 43, 35,  27, 27, 23,  19, 19, 15, 235,151,127, 195,115, 83, 159, 87, 51, 123, 63, 27, 235,211,199, 199,171,155, 167,139,119, 135,107, 87, 159, 91, 83
-	},
-	/* i don't think quake2 uses fullbrights */
-	{ 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 }
-};
+		unsigned short vertex;
+		unsigned short texcoord;
+	} md2_meshvert_t;
 
-static void swap_md2(void *filedata, size_t filesize)
-{
-	unsigned char *f = (unsigned char*)filedata;
+	unsigned char * const f = (unsigned char*)filedata;
 	md2_header_t *header;
-	int i;
+	int i, j;
+	model_t model;
+	mesh_t *mesh;
+	skininfo_t *skininfo;
+	frameinfo_t *frameinfo;
+	md2_meshvert_t *meshverts;
+	float iwidth, iheight;
+	float *v, *n;
 
 	header = (md2_header_t*)f;
 
+/* validate format */
+	if (memcmp(header->ident, "IDP2", 4))
+		return (out_error && (*out_error = msprintf("wrong format (not IDP2)"))), false;
+	if (LittleLong(header->version) != 8)
+		return (out_error && (*out_error = msprintf("wrong format (version not 8)"))), false;
+
+/* byteswap file */
 	header->version       = LittleLong(header->version);
 	header->skinwidth     = LittleLong(header->skinwidth);
 	header->skinheight    = LittleLong(header->skinheight);
@@ -133,123 +130,35 @@ static void swap_md2(void *filedata, size_t filesize)
 	header->offset_glcmds = LittleLong(header->offset_glcmds);
 	header->offset_end    = LittleLong(header->offset_end);
 
-/* skip skins (they're only strings so they aren't swapped) */
-
-/* swap texcoords */
-	for (i = 0; i < header->num_st; i++)
-	{
-		dstvert_t *texcoord = (dstvert_t*)(f + header->offset_st) + i;
-		texcoord->s = LittleShort(texcoord->s);
-		texcoord->t = LittleShort(texcoord->t);
-	}
-
-/* swap triangles */
-	for (i = 0; i < header->num_tris; i++)
-	{
-		dtriangle_t *triangle = (dtriangle_t*)(f + header->offset_tris) + i;
-		triangle->index_xyz[0] = LittleShort(triangle->index_xyz[0]);
-		triangle->index_xyz[1] = LittleShort(triangle->index_xyz[1]);
-		triangle->index_xyz[2] = LittleShort(triangle->index_xyz[2]);
-		triangle->index_st[0] = LittleShort(triangle->index_st[0]);
-		triangle->index_st[1] = LittleShort(triangle->index_st[1]);
-		triangle->index_st[2] = LittleShort(triangle->index_st[2]);
-	}
-
-/* swap glcmds */
-	for (i = 0; i < header->num_glcmds; i++)
-	{
-		int *glcmd = (int*)(f + header->offset_glcmds) + i;
-		*glcmd = LittleLong(*glcmd);
-	}
-
-/* read frames */
-	f += header->offset_frames;
-
-	for (i = 0; i < header->num_frames; i++)
-	{
-		daliasframe_t *frame = (daliasframe_t*)f;
-
-		frame->scale[0] = LittleFloat(frame->scale[0]);
-		frame->scale[1] = LittleFloat(frame->scale[1]);
-		frame->scale[2] = LittleFloat(frame->scale[2]);
-		frame->translate[0] = LittleFloat(frame->translate[0]);
-		frame->translate[1] = LittleFloat(frame->translate[1]);
-		frame->translate[2] = LittleFloat(frame->translate[2]);
-
-		f += header->framesize;
-	}
-}
-
-bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
-{
-	typedef struct md2_meshvert_s
-	{
-		unsigned short vertex;
-		unsigned short texcoord;
-	} md2_meshvert_t;
-
-	unsigned char *f = (unsigned char*)filedata;
-	md2_header_t *header;
-	int i, j;
-	const md2_skin_t *md2skins;
-	const dstvert_t *dstverts;
-	const dtriangle_t *dtriangles;
-	model_t model;
-	mesh_t *mesh;
-	md2_meshvert_t *meshverts;
-	float iwidth, iheight;
-
-	header = (md2_header_t*)f;
-
-/* validate format */
-	if (memcmp(header->ident, "IDP2", 4))
-	{
-		if (out_error)
-			*out_error = msprintf("wrong format (not IDP2)");
-		return false;
-	}
-	if (LittleLong(header->version) != 8)
-	{
-		if (out_error)
-			*out_error = msprintf("wrong format (version not 8)");
-		return false;
-	}
-
-/* byteswap file */
-	swap_md2(filedata, filesize);
-
-/* stuff */
-	md2skins = (md2_skin_t*)(f + header->offset_skins);
-	dstverts = (dstvert_t*)(f + header->offset_st);
-	dtriangles = (dtriangle_t*)(f + header->offset_tris);
-
 /* stuff */
 	model.total_skins = header->num_skins;
 	model.num_skins = header->num_skins;
 	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
 
-	for (i = 0; i < model.num_skins; i++)
+	for (i = 0, skininfo = model.skininfo; i < model.num_skins; i++, skininfo++)
 	{
-		model.skininfo[i].frametime = 0.1f;
-		model.skininfo[i].num_skins = 1;
-		model.skininfo[i].skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-		model.skininfo[i].skins[0].name = copystring(md2skins[i].name);
-		model.skininfo[i].skins[0].offset = i;
+		const md2_skin_t *md2skin = (const md2_skin_t*)(f + header->offset_skins) + i;
+
+		skininfo->frametime = 0.1f;
+		skininfo->num_skins = 1;
+		skininfo->skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
+		skininfo->skins[0].name = copystring(md2skin->name);
+		skininfo->skins[0].offset = i;
 	}
 
 	model.total_frames = header->num_frames;
 	model.num_frames = header->num_frames;
 	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
 
-	for (i = 0; i < model.num_frames; i++)
+	for (i = 0, frameinfo = model.frameinfo; i < model.num_frames; i++, frameinfo++)
 	{
 		const daliasframe_t *md2frame = (const daliasframe_t*)(f + header->offset_frames + i * header->framesize);
 
-		model.frameinfo[i].frametime = 0.1f;
-		model.frameinfo[i].num_frames = 1;
-		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = copystring(md2frame->name);
-		model.frameinfo[i].frames[0].offset = i;
+		frameinfo->frametime = 0.1f;
+		frameinfo->num_frames = 1;
+		frameinfo->frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
+		frameinfo->frames[0].name = copystring(md2frame->name);
+		frameinfo->frames[0].offset = i;
 	}
 
 	model.num_meshes = 1;
@@ -269,11 +178,11 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	mesh->name = copystring("md2mesh");
 
+/* read skins */
 	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.num_skins);
 	for (i = 0; i < model.num_skins; i++)
 	{
-		void *filedata;
-		size_t filesize;
+		const md2_skin_t *md2skin = (const md2_skin_t*)(f + header->offset_skins) + i;
 		char *error;
 		image_rgba_t *image;
 
@@ -282,27 +191,19 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	/* try to load the image file mentioned in the md2 */
 	/* if any of the skins fail to load, they will be left as null */
-		if (!loadfile(md2skins[i].name, &filedata, &filesize, &error))
-		{
-			printf("md2: failed to load file \"%s\": %s\n", md2skins[i].name, error);
-			qfree(error);
-			continue;
-		}
-
-		image = image_load(md2skins[i].name, filedata, filesize, &error);
+		image = image_load_from_file(md2skin->name, &error);
 		if (!image)
 		{
-			printf("md2: failed to load image \"%s\": %s\n", md2skins[i].name, error);
+		/* this is a warning. FIXME - return warnings too, don't print them here */
+			printf("md2: failed to load image \"%s\": %s\n", md2skin->name, error);
 			qfree(error);
-			qfree(filedata);
 			continue;
 		}
-
-		qfree(filedata);
 
 		mesh->skins[i].components[SKIN_DIFFUSE] = image;
 	}
 
+/* read triangles */
 	mesh->num_triangles = header->num_tris;
 	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
 
@@ -310,11 +211,13 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	meshverts = (md2_meshvert_t*)qmalloc(sizeof(md2_meshvert_t) * mesh->num_triangles * 3);
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
+		const dtriangle_t *dtriangle = (const dtriangle_t*)(f + header->offset_tris) + i;
+
 		for (j = 0; j < 3; j++)
 		{
 			int vertnum;
-			unsigned short xyz = dtriangles[i].index_xyz[j];
-			unsigned short st = dtriangles[i].index_st[j];
+			unsigned short xyz = LittleShort(dtriangle->index_xyz[j]);
+			unsigned short st = LittleShort(dtriangle->index_st[j]);
 
 			for (vertnum = 0; vertnum < mesh->num_vertices; vertnum++)
 			{
@@ -336,39 +239,43 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
+/* read texcoords */
 	mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
 	iwidth = 1.0f / header->skinwidth;
 	iheight = 1.0f / header->skinheight;
 	for (i = 0; i < mesh->num_vertices; i++)
 	{
-		mesh->texcoord2f[i*2+0] = (dstverts[meshverts[i].texcoord].s + 0.5f) * iwidth;
-		mesh->texcoord2f[i*2+1] = (dstverts[meshverts[i].texcoord].t + 0.5f) * iheight;
+		const dstvert_t *dstvert = (const dstvert_t*)(f + header->offset_st) + meshverts[i].texcoord;
+		mesh->texcoord2f[i*2+0] = (LittleFloat(dstvert->s) + 0.5f) * iwidth;
+		mesh->texcoord2f[i*2+1] = (LittleFloat(dstvert->t) + 0.5f) * iheight;
 	}
 
-	mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
-	mesh->normal3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
-	f += header->offset_frames;
+/* read frames */
+	v = mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
+	n = mesh->normal3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	for (i = 0; i < model.num_frames; i++)
 	{
-		daliasframe_t *frame = (daliasframe_t*)f;
-		int firstvertex = i * mesh->num_vertices * 3;
+		const daliasframe_t *frame = (const daliasframe_t*)(f + header->offset_frames + i * header->framesize);
+		const dtrivertx_t *vtxbase = (const dtrivertx_t*)(frame + 1);
+		float scale[3], translate[3];
 
-		for (j = 0; j < mesh->num_vertices; j++)
+		for (j = 0; j < 3; j++)
 		{
-			dtrivertx_t *vtx = &frame->verts[meshverts[j].vertex];
-			float *v = mesh->vertex3f + firstvertex + j * 3;
-			float *n = mesh->normal3f + firstvertex + j * 3;
+			scale[j] = LittleFloat(frame->scale[j]);
+			translate[j] = LittleFloat(frame->translate[j]);
+		}
 
-			v[0] = frame->translate[0] + frame->scale[0] * vtx->v[0];
-			v[1] = frame->translate[1] + frame->scale[1] * vtx->v[1];
-			v[2] = frame->translate[2] + frame->scale[2] * vtx->v[2];
+		for (j = 0; j < mesh->num_vertices; j++, v += 3, n += 3)
+		{
+			const dtrivertx_t *vtx = vtxbase + meshverts[j].vertex;
+			v[0] = translate[0] + scale[0] * vtx->v[0];
+			v[1] = translate[1] + scale[1] * vtx->v[1];
+			v[2] = translate[2] + scale[2] * vtx->v[2];
 
 			n[0] = anorms[vtx->lightnormalindex][0];
 			n[1] = anorms[vtx->lightnormalindex][1];
 			n[2] = anorms[vtx->lightnormalindex][2];
 		}
-
-		f += header->framesize;
 	}
 
 	qfree(meshverts);
@@ -767,17 +674,17 @@ static void md2_build_glcmds(const dstvert_t *texcoords, int skinwidth, int skin
 	qfree(used);
 }
 
-bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_size)
+bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error) /* FIXME - return errors instead of printfing them */
 {
 	char *error;
-	unsigned char *data;
 	int skinwidth, skinheight;
 	char **skinfilenames;
+	const skininfo_t *skininfo;
 	model_t *model;
 	const mesh_t *mesh;
 	md2_data_t *md2data;
 	md2_header_t *header;
-	int offset;
+	dtriangle_t *dtriangles;
 	int i, j, k;
 
 	model = model_merge_meshes(orig_model);
@@ -786,10 +693,8 @@ bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_si
 
 	skinwidth = (texwidth != -1) ? texwidth : 0;
 	skinheight = (texheight != -1) ? texheight : 0;
-	for (i = 0; i < model->num_skins; i++)
+	for (i = 0, skininfo = model->skininfo; i < model->num_skins; i++, skininfo++)
 	{
-		const skininfo_t *skininfo = &model->skininfo[i];
-
 		for (j = 0; j < skininfo->num_skins; j++)
 		{
 			int offset = skininfo->skins[j].offset;
@@ -827,161 +732,147 @@ bool_t model_md2_save(const model_t *orig_model, void **out_data, size_t *out_si
 		return false;
 	}
 
-/* allocate memory for writing */
-	data = qmalloc(16*1024*1024); /* FIXME */
-
-/* create 8-bit textures */
+/* create 8-bit skins and save them to PCX files */
 	skinfilenames = (char**)qmalloc(sizeof(char*) * model->num_skins);
 
-	for (i = 0; i < model->num_skins; i++)
+	for (i = 0, skininfo = model->skininfo; i < model->num_skins; i++, skininfo++)
 	{
 		image_paletted_t *pimage;
-		size_t imagesize;
 
-		offset = model->skininfo[i].skins[0].offset; /* skingroups not supported */
+		int offset = skininfo->skins[0].offset; /* skingroups not supported, just take the first skin from the group */
 
-		pimage = image_palettize(&quake2palette, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
+		skinfilenames[i] = md2_create_skin_filename(skininfo->skins[0].name);
 
-		imagesize = image_pcx_save(pimage, data, 16*1024*1024);
-		if (!imagesize)
-		{
-			printf("model_md2_save: failed to create pcx\n");
-			skinfilenames[i] = NULL;
-			goto skinerror;
-		}
+		pimage = image_palettize(&palette_quake2, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 
-		skinfilenames[i] = md2_create_skin_filename(model->skininfo[i].skins[0].name);
-
-		if (!writefile(skinfilenames[i], data, imagesize, &error))
+	/* FIXME - this shouldn't be a fatal error */
+		if (!image_paletted_save(skinfilenames[i], pimage, &error))
 		{
 			printf("model_md2_save: failed to write %s: %s\n", skinfilenames[i], error);
 			qfree(error);
-			goto skinerror;
+			qfree(pimage);
+			for (j = 0; j < i; j++)
+				qfree(skinfilenames[j]);
+			qfree(skinfilenames);
+			model_free(model);
+			return false;
 		}
 
-		skinwidth = pimage->width;
-		skinheight = pimage->height;
 		qfree(pimage);
-		continue;
-
-skinerror:
-		qfree(pimage);
-		for (j = 0; j <= i; j++)
-			qfree(skinfilenames[j]);
-		qfree(skinfilenames);
-		qfree(data);
-		model_free(model);
-		return false;
 	}
 
 /* optimize vertices for md2 format */
 	md2data = md2_process_vertices(model, mesh, skinwidth, skinheight);
 
 /* write header */
-	offset = 0;
-
-	header = (md2_header_t*)(data + offset);
+	header = (md2_header_t*)xbuf_reserve_data(xbuf, sizeof(md2_header_t));
 
 	memcpy(header->ident, "IDP2", 4);
-	header->version = 8;
-	header->skinwidth = skinwidth;
-	header->skinheight = skinheight;
-	header->framesize = sizeof(daliasframe_t) + sizeof(dtrivertx_t) * (md2data->numvertices - 1); /* subtract one because md2_frame_t has an array of one */
-	header->num_skins = model->num_skins;
-	header->num_vertices = md2data->numvertices;
-	header->num_st = md2data->numtexcoords;
-	header->num_tris = mesh->num_triangles;
-	header->num_glcmds = 0; /* filled in later */
-	header->num_frames = model->num_frames;
-	header->offset_skins = 0;
-	header->offset_st = 0;
-	header->offset_tris = 0;
+	header->version       = LittleLong(8);
+	header->skinwidth     = LittleLong(skinwidth);
+	header->skinheight    = LittleLong(skinheight);
+	header->framesize     = LittleLong(sizeof(daliasframe_t) + sizeof(dtrivertx_t) * md2data->numvertices);
+	header->num_skins     = LittleLong(model->num_skins);
+	header->num_vertices  = LittleLong(md2data->numvertices);
+	header->num_st        = LittleLong(md2data->numtexcoords);
+	header->num_tris      = LittleLong(mesh->num_triangles);
+	header->num_glcmds    = 0; /* filled in later */
+	header->num_frames    = LittleLong(model->num_frames);
+	header->offset_skins  = 0;
+	header->offset_st     = 0;
+	header->offset_tris   = 0;
 	header->offset_frames = 0;
 	header->offset_glcmds = 0;
-	header->offset_end = 0;
-
-	offset += sizeof(md2_header_t);
+	header->offset_end    = 0;
 
 /* write skins */
-	header->offset_skins = offset;
+	header->offset_skins = LittleLong(xbuf_get_bytes_written(xbuf));
 
 	for (i = 0; i < model->num_skins; i++)
 	{
-		md2_skin_t *md2skin = (md2_skin_t*)(data + offset);
-		strlcpy(md2skin->name, skinfilenames[i], sizeof(md2skin->name));
+		md2_skin_t md2skin;
+		
+		strlcpy(md2skin.name, skinfilenames[i], sizeof(md2skin.name));
 
-		offset += sizeof(md2_skin_t);
+		xbuf_write_data(xbuf, sizeof(md2_skin_t), &md2skin);
 	}
 
 /* write texcoords */
-	header->offset_st = offset;
-
-	memcpy(data + offset, md2data->texcoords, sizeof(dstvert_t) * md2data->numtexcoords);
-
-	offset += sizeof(dstvert_t) * md2data->numtexcoords;
-
-/* write triangles */
-	header->offset_tris = offset;
-
-	for (i = 0; i < mesh->num_triangles; i++)
+	for (i = 0; i < md2data->numtexcoords; i++)
 	{
-		dtriangle_t *dtriangle = (dtriangle_t*)(data + offset);
-
-		for (j = 0; j < 3; j++)
-		{
-			dtriangle->index_xyz[j] = md2data->vertex_lookup[mesh->triangle3i[i*3+j]];
-			dtriangle->index_st[j] = md2data->texcoord_lookup[mesh->triangle3i[i*3+j]];
-		}
-
-		offset += sizeof(dtriangle_t);
+		md2data->texcoords[i].s = LittleShort(md2data->texcoords[i].s);
+		md2data->texcoords[i].t = LittleShort(md2data->texcoords[i].t);
 	}
 
+	header->offset_st = LittleLong(xbuf_get_bytes_written(xbuf));
+
+	xbuf_write_data(xbuf, sizeof(dstvert_t) * md2data->numtexcoords, md2data->texcoords);
+
+/* write triangles */
+	dtriangles = (dtriangle_t*)qmalloc(sizeof(dtriangle_t) * mesh->num_triangles);
+	for (i = 0; i < mesh->num_triangles; i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			dtriangles[i].index_xyz[j] = LittleShort(md2data->vertex_lookup[mesh->triangle3i[i*3+j]]);
+			dtriangles[i].index_st[j] = LittleShort(md2data->texcoord_lookup[mesh->triangle3i[i*3+j]]);
+		}
+	}
+
+	header->offset_tris = LittleLong(xbuf_get_bytes_written(xbuf));
+
+	xbuf_write_data(xbuf, sizeof(dtriangle_t) * mesh->num_triangles, dtriangles);
+
 /* write frames */
-	header->offset_frames = offset;
+	header->offset_frames = LittleLong(xbuf_get_bytes_written(xbuf));
 
 	for (i = 0; i < model->num_frames; i++)
 	{
-		daliasframe_t *md2frame = (daliasframe_t*)(data + offset);
-
-		strlcpy(md2frame->name, model->frameinfo[i].frames[0].name, sizeof(md2frame->name));
+		daliasframe_t md2frame;
 
 		for (j = 0; j < 3; j++)
 		{
-			md2frame->scale[j] = md2data->frames[i].scale[j];
-			md2frame->translate[j] = md2data->frames[i].translate[j];
+			md2frame.scale[j] = LittleFloat(md2data->frames[i].scale[j]);
+			md2frame.translate[j] = LittleFloat(md2data->frames[i].translate[j]);
 		}
+
+		strlcpy(md2frame.name, model->frameinfo[i].frames[0].name, sizeof(md2frame.name));
+
+		xbuf_write_data(xbuf, sizeof(daliasframe_t), &md2frame);
 
 	/* write vertices */
 		for (j = 0; j < md2data->numvertices; j++)
 		{
 			const dtrivertx_t *md2vertex = md2data->original_vertices + md2data->vertices[j] * model->num_frames + i;
+			dtrivertx_t vtx;
 
 			for (k = 0; k < 3; k++)
-				md2frame->verts[j].v[k] = md2vertex->v[k];
+				vtx.v[k] = md2vertex->v[k];
 
-			md2frame->verts[j].lightnormalindex = md2vertex->lightnormalindex;
+			vtx.lightnormalindex = md2vertex->lightnormalindex;
+
+			xbuf_write_data(xbuf, sizeof(dtrivertx_t), &vtx);
 		}
-
-		offset += header->framesize;
 	}
 
 /* write glcmds */
-	triangles = (dtriangle_t*)(data + header->offset_tris);
-	num_tris = header->num_tris;
+	triangles = dtriangles;
+	num_tris = mesh->num_triangles;
 
-	md2_build_glcmds((dstvert_t*)(data + header->offset_st), header->skinwidth, header->skinheight);
+	md2_build_glcmds(md2data->texcoords, skinwidth, skinheight);
 
-	header->num_glcmds = numcommands;
-	header->offset_glcmds = offset;
+	header->num_glcmds = LittleLong(numcommands);
+	header->offset_glcmds = LittleLong(xbuf_get_bytes_written(xbuf));
 
-	memcpy(data + offset, commands, sizeof(int) * numcommands);
-
-	offset += sizeof(int) * numcommands;
+	for (i = 0; i < numcommands; i++)
+		commands[i] = LittleLong(commands[i]);
+	xbuf_write_data(xbuf, sizeof(int) * numcommands, commands);
 
 /* write end */
-	header->offset_end = offset;
+	header->offset_end = LittleLong(xbuf_get_bytes_written(xbuf));
 
 /* done */
+	qfree(dtriangles);
 	md2_free_data(md2data);
 
 	for (i = 0; i < model->num_skins; i++)
@@ -989,9 +880,5 @@ skinerror:
 	qfree(skinfilenames);
 
 	model_free(model);
-
-	swap_md2(data, offset);
-	*out_data = data;
-	*out_size = offset;
 	return true;
 }

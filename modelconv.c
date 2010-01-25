@@ -29,51 +29,20 @@ const char *g_skinpath = NULL;
 
 static model_t *model = NULL;
 
-/*static*/ enum format { FMT_UNKNOWN = 0, FMT_MDL, FMT_MD2, FMT_TXT } /*outformat = FMT_UNKNOWN*/;
-
-enum format identify_extension(const char *filename)
-{
-	const char *ext;
-
-	if ((ext = strrchr(filename, '.')))
-	{
-		if (!strcasecmp(ext, ".mdl"))
-			return FMT_MDL;
-		if (!strcasecmp(ext, ".md2"))
-			return FMT_MD2;
-		if (!strcasecmp(ext, ".txt"))
-			return FMT_TXT;
-	}
-
-	return FMT_UNKNOWN;
-}
-
 bool_t replacetexture(const char *filename)
 {
-	void *filedata;
-	size_t filesize;
 	char *error;
 	image_rgba_t *image;
 	int i;
 	mesh_t *mesh;
 
-	if (!loadfile(filename, &filedata, &filesize, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		return false;
-	}
-
-	image = image_load(filename, filedata, filesize, &error);
+	image = image_load_from_file(filename, &error);
 	if (!image)
 	{
 		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
 		qfree(error);
-		qfree(filedata);
 		return false;
 	}
-
-	qfree(filedata);
 
 /* clear old skins */
 	model_clear_skins(model);
@@ -99,34 +68,7 @@ bool_t replacetexture(const char *filename)
 	return true;
 }
 
-model_t *loadmodel(const char *filename)
-{
-	void *filedata;
-	size_t filesize;
-	char *error;
-	model_t *model;
-
-	if (!loadfile(filename, &filedata, &filesize, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		return NULL;
-	}
-
-	model = (model_t*)qmalloc(sizeof(model_t));
-
-	if (!model_load(filename, filedata, filesize, model, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		qfree(model);
-		model = NULL;
-	}
-
-	qfree(filedata);
-	return model;
-}
-
+#if 0 /* currently unused */
 void dump_txt(const char *filename, const model_t *model)
 {
 	int i, j, k;
@@ -236,9 +178,11 @@ void dump_txt(const char *filename, const model_t *model)
 
 	printf("Saved %s.\n", filename);
 }
+#endif
 
 int main(int argc, char **argv)
 {
+	char *error;
 	char infilename[1024] = {0};
 	char outfilename[1024] = {0};
 	char texfilename[1024] = {0};
@@ -247,6 +191,7 @@ int main(int argc, char **argv)
 	int flags = 0;
 	int synctype = 0;
 	float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
+	bool_t facet = false;
 	int i, j, k;
 
 	set_atexit_final_event(dumpleaks);
@@ -314,8 +259,6 @@ int main(int argc, char **argv)
 			}
 			else if (!strcmp(argv[i], "-skinpath"))
 			{
-				char *error;
-
 				if (++i == argc)
 				{
 					printf("%s: missing argument for options '-skinpath'\n", argv[0]);
@@ -392,6 +335,10 @@ int main(int argc, char **argv)
 
 				offsets_z = (float)atof(argv[i]);
 			}
+			else if (!strcmp(argv[i], "-facet"))
+			{
+				facet = true;
+			}
 			else
 			{
 				printf("%s: unrecognized option '%s'\n", argv[0], argv[i]);
@@ -410,9 +357,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	model = loadmodel(infilename);
-	if (model == NULL)
+	model = model_load_from_file(infilename, &error);
+	if (!model)
+	{
+		printf("Failed to load model: %s.\n", error);
+		qfree(error);
 		return 0;
+	}
+
+	printf("Loaded %s.\n", infilename);
 
 	model->flags = flags;
 	model->synctype = synctype;
@@ -455,6 +408,11 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (facet)
+	{
+		model_facetize(model);
+	}
+
 	if (!outfilename[0])
 	{
 	/* TODO - print brief analysis of input file (further analysis done on option) */
@@ -462,61 +420,10 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		void *filedata;
-		size_t filesize;
-
-		switch (identify_extension(outfilename))
+		if (!model_save(outfilename, model, &error))
 		{
-		default:
-			printf("Unrecognized or missing file extension.\n");
-			break;
-		case FMT_TXT:
-			dump_txt(outfilename, model);
-			break;
-		case FMT_MDL:
-			if (model_mdl_save(model, &filedata, &filesize))
-			{
-				char *error;
-
-				if (!writefile(outfilename, filedata, filesize, &error))
-				{
-					printf("Failed to write %s: %s.\n", outfilename, error);
-					qfree(error);
-				}
-				else
-				{
-					printf("Saved %s.\n", outfilename);
-				}
-
-				qfree(filedata);
-			}
-			else
-			{
-				printf("Failed to save model as mdl.\n");
-			}
-			break;
-		case FMT_MD2:
-			if (model_md2_save(model, &filedata, &filesize))
-			{
-				char *error;
-
-				if (!writefile(outfilename, filedata, filesize, &error))
-				{
-					printf("Failed to write %s: %s.\n", outfilename, error);
-					qfree(error);
-				}
-				else
-				{
-					printf("Saved %s.\n", outfilename);
-				}
-
-				qfree(filedata);
-			}
-			else
-			{
-				printf("Failed to save model as md2.\n");
-			}
-			break;
+			printf("Failed to save model: %s.\n", error);
+			qfree(error);
 		}
 	}
 

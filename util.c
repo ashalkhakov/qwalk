@@ -199,18 +199,38 @@ bool_t makepath(char *path, char **out_error)
 	return true;
 }
 
+FILE *openfile_write(const char *filename, char **out_error)
+{
+	bool_t file_exists;
+	FILE *fp;
+
+	file_exists = false;
+	if ((fp = fopen(filename, "rb")))
+	{
+		file_exists = true;
+		fclose(fp);
+	}
+
+	if (file_exists)
+	{
+		printf("File %s already exists. Overwrite? [y/N] ", filename);
+		if (!yesno())
+			return (out_error && (*out_error = msprintf("user aborted operation"))), NULL;
+	}
+
+	fp = fopen(filename, "wb");
+	if (!fp)
+		return (out_error && (*out_error = msprintf("couldn't open file: %s", strerror(errno)))), NULL;
+
+	return fp;
+}
+
 bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **out_error)
 {
 	FILE *fp;
 	long ftellret;
 	unsigned char *filemem;
 	size_t filesize, readsize;
-
-	*out_data = NULL;
-	if (out_size)
-		*out_size = 0;
-	if (out_error)
-		*out_error = NULL;
 
 	fp = fopen(filename, "rb");
 	if (!fp)
@@ -264,48 +284,20 @@ bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **
 bool_t writefile(const char *filename, const void *data, size_t size, char **out_error)
 {
 	FILE *fp;
-	bool_t file_exists;
-	size_t wrotesize;
 
-	if (out_error)
-		*out_error = NULL;
-
-	file_exists = false;
-	if ((fp = fopen(filename, "rb")))
-	{
-		file_exists = true;
-		fclose(fp);
-	}
-
-	if (file_exists)
-	{
-		printf("File %s already exists. Overwrite? [y/N] ", filename);
-		if (!yesno())
-		{
-			if (out_error)
-				*out_error = msprintf("User aborted operation");
-			return false;
-		}
-	}
-
-	fp = fopen(filename, "wb");
+	fp = openfile_write(filename, out_error);
 	if (!fp)
-	{
-		if (out_error)
-			*out_error = msprintf("Couldn't open file: %s", strerror(errno));
 		return false;
-	}
 
-	wrotesize = fwrite(data, 1, size, fp);
-	fclose(fp);
-
-	if (wrotesize < size)
+	if (fwrite(data, 1, size, fp) < size)
 	{
 		if (out_error)
 			*out_error = msprintf("Failed to write file: %s", strerror(errno));
+		fclose(fp);
 		return false;
 	}
 
+	fclose(fp);
 	return true;
 }
 
@@ -325,6 +317,8 @@ typedef struct alloc_s
 } alloc_t;
 
 static alloc_t *alloc_head = NULL, *alloc_tail = NULL;
+static size_t bytes_alloced = 0;
+static size_t peak_bytes = 0;
 
 void *qmalloc_(size_t numbytes, const char *file, int line)
 {
@@ -340,6 +334,9 @@ void *qmalloc_(size_t numbytes, const char *file, int line)
 
 	if (!mem)
 		return NULL;
+
+	bytes_alloced += numbytes;
+	peak_bytes = max(peak_bytes, bytes_alloced);
 
 	alloc = (alloc_t*)mem;
 	alloc->numbytes = numbytes;
@@ -365,6 +362,8 @@ void qfree(void *mem)
 
 	alloc = (alloc_t*)mem - 1;
 
+	bytes_alloced -= alloc->numbytes;
+
 	if (alloc->prev) alloc->prev->next = alloc->next;
 	if (alloc->next) alloc->next->prev = alloc->prev;
 	if (alloc_head == alloc) alloc_head = alloc->next;
@@ -376,6 +375,8 @@ void qfree(void *mem)
 void dumpleaks(void)
 {
 	alloc_t *alloc, *next;
+
+	printf("Peak memory allocated: %d bytes\n", peak_bytes);
 
 	if (!alloc_head)
 		return;
@@ -459,6 +460,8 @@ void *getprocaddress(dllhandle_t handle, const char *name)
 #endif
 }
 
+/* atexit events */
+
 typedef struct atexit_event_s
 {
 	void (*function)(void);
@@ -509,4 +512,300 @@ void call_atexit_events(void)
 		(*atexit_final_event)();
 		atexit_final_event = NULL;
 	}
+}
+
+/* expandable buffers */
+
+typedef struct xbuf_block_s
+{
+	unsigned char *memory;
+
+	size_t bytes_written;
+
+	struct xbuf_block_s *prev, *next;
+} xbuf_block_t;
+
+struct xbuf_s
+{
+	size_t block_size;
+
+	xbuf_block_t *block_head, *block_tail;
+
+	size_t bytes_written;
+
+	FILE *fp;
+
+	char *error;
+};
+
+/* if this is a file buffer, flush the block's contents into the file and reset the block */
+static void xbuf_flush(xbuf_t *xbuf)
+{
+	if (xbuf->error || !xbuf->fp)
+		return;
+
+	if (fwrite(xbuf->block_head->memory, 1, xbuf->block_head->bytes_written, xbuf->fp) < xbuf->block_head->bytes_written)
+	{
+		xbuf->error = msprintf("failed to write to file: %s", strerror(errno));
+		return;
+	}
+
+	xbuf->block_head->bytes_written = 0;
+}
+
+static xbuf_block_t *xbuf_new_block(xbuf_t *xbuf)
+{
+	xbuf_block_t *block;
+
+	block = (xbuf_block_t*)qmalloc(sizeof(xbuf_block_t) + xbuf->block_size);
+	if (!block)
+		return NULL;
+
+	block->memory = (unsigned char*)(block + 1);
+	block->bytes_written = 0;
+
+	block->prev = xbuf->block_tail;
+	block->next = NULL;
+
+	if (block->prev)
+		block->prev->next = block;
+
+	if (!xbuf->block_head)
+		xbuf->block_head = block;
+	xbuf->block_tail = block;
+
+	return block;
+}
+
+xbuf_t *xbuf_create_memory(size_t block_size, char **out_error)
+{
+	xbuf_t *xbuf;
+
+	if (block_size < 4096)
+		block_size = 4096;
+
+	xbuf = (xbuf_t*)qmalloc(sizeof(xbuf_t));
+	if (!xbuf)
+		return (out_error && (*out_error = msprintf("out of memory"))), NULL;
+
+	xbuf->block_size = block_size;
+	xbuf->block_head = NULL;
+	xbuf->block_tail = NULL;
+	xbuf->bytes_written = 0;
+	xbuf->fp = NULL;
+	xbuf->error = NULL;
+
+	if (!xbuf_new_block(xbuf)) /* create the first block */
+	{
+		qfree(xbuf);
+		return (out_error && (*out_error = msprintf("out of memory"))), NULL;
+	}
+
+	return xbuf;
+}
+
+xbuf_t *xbuf_create_file(size_t block_size, const char *filename, char **out_error)
+{
+	xbuf_t *xbuf;
+
+	if (!filename)
+		return (out_error && (*out_error = msprintf("no filename specified"))), NULL;
+
+	xbuf = xbuf_create_memory(block_size, out_error);
+	if (!xbuf)
+		return NULL;
+
+	xbuf->fp = openfile_write(filename, out_error);
+	if (!xbuf->fp)
+	{
+		xbuf_free(xbuf, NULL);
+		return NULL;
+	}
+
+	return xbuf;
+}
+
+bool_t xbuf_free(xbuf_t *xbuf, char **out_error)
+{
+	char *error = xbuf->error;
+	xbuf_block_t *block, *nextblock;
+
+	if (xbuf->fp)
+		fclose(xbuf->fp);
+
+	for (block = xbuf->block_head; block; block = nextblock)
+	{
+		nextblock = block->next;
+		qfree(block);
+	}
+
+	qfree(xbuf);
+
+	if (error)
+	{
+		if (out_error)
+			*out_error = error;
+		else
+			qfree(error);
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+/* write a piece of data, which might end up spanning multiple blocks */
+void xbuf_write_data(xbuf_t *xbuf, size_t length, const void *data)
+{
+	xbuf_block_t *block;
+
+	if (xbuf->error)
+		return;
+
+	block = xbuf->block_tail;
+
+	for (;;)
+	{
+		if (length < xbuf->block_size - block->bytes_written)
+		{
+		/* data fits in current block */
+			memcpy(block->memory + block->bytes_written, data, length);
+
+			xbuf->bytes_written += length;
+			block->bytes_written += length;
+
+			return;
+		}
+		else
+		{
+		/* fill the rest of the current block with as much data as fits */
+			size_t amt = xbuf->block_size - block->bytes_written;
+
+			memcpy(block->memory + block->bytes_written, data, amt);
+
+			xbuf->bytes_written += amt;
+			block->bytes_written += amt;
+
+			length -= amt;
+			data = (unsigned char*)data + amt;
+
+		/* get more space */
+			if (xbuf->fp)
+				xbuf_flush(xbuf);
+			else
+				block = xbuf_new_block(xbuf);
+		}
+	}
+}
+
+void xbuf_write_byte(xbuf_t *xbuf, unsigned char byte)
+{
+	xbuf_write_data(xbuf, 1, &byte);
+}
+
+/* reserve a contiguous piece of memory */
+void *xbuf_reserve_data(xbuf_t *xbuf, size_t length)
+{
+	xbuf_block_t *block;
+	void *memory;
+
+	if (xbuf->error)
+		return NULL;
+	if (xbuf->fp)
+		return NULL; /* this won't work on file buffers currently (FIXME - is it possible?) */
+	if (length > xbuf->block_size)
+		return NULL;
+
+/* get the current block */
+	block = xbuf->block_tail;
+
+/* if it won't fit in the current block, get more space */
+	if (length >= xbuf->block_size - block->bytes_written)
+	{
+		if (xbuf->fp)
+			xbuf_flush(xbuf);
+		else
+			block = xbuf_new_block(xbuf);
+	}
+
+/* return memory pointer and advance bytes_written */
+	memory = block->memory + block->bytes_written;
+
+	xbuf->bytes_written += length;
+	block->bytes_written += length;
+
+	return memory;
+}
+
+int xbuf_get_bytes_written(const xbuf_t *xbuf)
+{
+	return xbuf->bytes_written;
+}
+
+bool_t xbuf_write_to_file(xbuf_t *xbuf, const char *filename, char **out_error)
+{
+	FILE *fp;
+	xbuf_block_t *block;
+
+	if (xbuf->error)
+		return (out_error && (*out_error = msprintf("cannot write buffer to file: a previous error occurred"))), false;
+	if (xbuf->fp)
+		return (out_error && (*out_error = msprintf("xbuf_write_to_file called on a file buffer"))), false;
+
+	fp = openfile_write(filename, out_error);
+	if (!fp)
+		return false;
+
+	for (block = xbuf->block_head; block; block = block->next)
+	{
+		if (fwrite(block->memory, 1, block->bytes_written, fp) < block->bytes_written)
+		{
+			if (out_error)
+				*out_error = msprintf("failed to write to file: %s", strerror(errno));
+			fclose(fp);
+			return false;
+		}
+	}
+
+	fclose(fp);
+	return true;
+}
+
+/* return the data in a newly allocated contiguous block, then free the xbuf */
+bool_t xbuf_finish_memory(xbuf_t *xbuf, void **out_data, size_t *out_length, char **out_error)
+{
+	void *data;
+	unsigned char *p;
+	xbuf_block_t *block;
+
+	if (xbuf->error)
+		return xbuf_free(xbuf, out_error);
+
+	data = qmalloc(xbuf->bytes_written);
+	if (!data)
+	{
+		xbuf_free(xbuf, NULL);
+		return (out_error && (*out_error = msprintf("out of memory"))), false;
+	}
+
+	p = (unsigned char*)data;
+	for (block = xbuf->block_head; block; block = block->next)
+	{
+		memcpy(p, block->memory, block->bytes_written);
+		p += block->bytes_written;
+	}
+
+	*out_data = data;
+	*out_length = xbuf->bytes_written;
+
+	return xbuf_free(xbuf, out_error); /* this will always return true */
+}
+
+/* finish writing to file, then free the xbuf */
+bool_t xbuf_finish_file(xbuf_t *xbuf, char **out_error)
+{
+	xbuf_flush(xbuf);
+
+	return xbuf_free(xbuf, out_error);
 }

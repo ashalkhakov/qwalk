@@ -18,6 +18,7 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include <stdio.h>
 #include <stdlib.h>
 
 typedef enum { false = 0, true = 1 } bool_t;
@@ -47,6 +48,7 @@ typedef enum { false = 0, true = 1 } bool_t;
 typedef float vec3f_t[3];
 
 #define VectorClear(a) ((a)[0]=0,(a)[1]=0,(a)[2]=0)
+#define VectorCopy(a,b) ((a)[0]=(b)[0],(a)[1]=(b)[1],(a)[2]=(b)[2])
 #define DotProduct(a,b) ((a)[0]*(b)[0]+(a)[1]*(b)[1]+(a)[2]*(b)[2])
 #define VectorSubtract(a,b,c) ((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1],(c)[2]=(a)[2]-(b)[2])
 #define VectorScale(in, scale, out) ((out)[0] = (in)[0] * (scale),(out)[1] = (in)[1] * (scale),(out)[2] = (in)[2] * (scale))
@@ -83,5 +85,24 @@ void *getprocaddress(dllhandle_t handle, const char *name);
 void add_atexit_event(void (*function)(void));
 void set_atexit_final_event(void (*function)(void));
 void call_atexit_events(void);
+
+/* expandable buffers */
+
+typedef struct xbuf_s xbuf_t;
+
+xbuf_t *xbuf_create_memory(size_t block_size, char **out_error);
+xbuf_t *xbuf_create_file(size_t block_size, const char *filename, char **out_error);
+
+bool_t xbuf_free(xbuf_t *xbuf, char **out_error);
+bool_t xbuf_finish_memory(xbuf_t *xbuf, void **out_data, size_t *out_length, char **out_error);
+bool_t xbuf_finish_file(xbuf_t *xbuf, char **out_error);
+
+bool_t xbuf_write_to_file(xbuf_t *xbuf, const char *filename, char **out_error);
+
+void xbuf_write_data(xbuf_t *xbuf, size_t length, const void *data);
+void xbuf_write_byte(xbuf_t *xbuf, unsigned char byte);
+void *xbuf_reserve_data(xbuf_t *xbuf, size_t length);
+
+int xbuf_get_bytes_written(const xbuf_t *xbuf);
 
 #endif

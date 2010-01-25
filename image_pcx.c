@@ -40,18 +40,6 @@ typedef struct pcx_header_s
 	char filler[58];
 } pcx_header_t;
 
-static void swap_pcx_header(pcx_header_t *header)
-{
-	header->xmin = LittleShort(header->xmin);
-	header->ymin = LittleShort(header->ymin);
-	header->xmax = LittleShort(header->xmax);
-	header->ymax = LittleShort(header->ymax);
-	header->hres = LittleShort(header->hres);
-	header->vres = LittleShort(header->vres);
-	header->bytes_per_line = LittleShort(header->bytes_per_line);
-	header->palette_type = LittleShort(header->palette_type);
-}
-
 image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image;
@@ -64,62 +52,36 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 	unsigned char databyte;
 	int runlen;
 
-	if (filesize < 128 + 1 + 768)
+	if (filesize < 128 + /* 1 + */ 768)
 		return NULL;
 
 	header = (pcx_header_t*)f;
+
+	header->xmin = LittleShort(header->xmin);
+	header->ymin = LittleShort(header->ymin);
+	header->xmax = LittleShort(header->xmax);
+	header->ymax = LittleShort(header->ymax);
+	header->hres = LittleShort(header->hres);
+	header->vres = LittleShort(header->vres);
+	header->bytes_per_line = LittleShort(header->bytes_per_line);
+	header->palette_type = LittleShort(header->palette_type);
+
 	f += 128;
 
-	swap_pcx_header(header);
-
 	if (header->manufacturer != 0x0a)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad manufacturer");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad manufacturer"))), NULL;
 	if (header->version != 5)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad version");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad version"))), NULL;
 	if (header->encoding != 1)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad encoding");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad encoding"))), NULL;
 	if (header->bits_per_pixel != 8)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad bits_per_pixel");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad bits_per_pixel"))), NULL;
 	if (header->xmax - header->xmin + 1 < 1 || header->xmax - header->xmin + 1 > 4096)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad xmax");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad xmax"))), NULL;
 	if (header->ymax - header->ymin + 1 < 1 || header->ymax - header->ymin + 1 > 4096)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad ymax");
-		return NULL;
-	}
-
+		return (out_error && (*out_error = msprintf("pcx: bad ymax"))), NULL;
 	if (header->color_planes != 1)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad color_planes");
-		return NULL;
-	}
+		return (out_error && (*out_error = msprintf("pcx: bad color_planes"))), NULL;
 
 	/* header.palette_type should be 1, but some pcxes use 0 or 2 for some reason, so ignore it */
 
@@ -129,19 +91,11 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 /* there is supposed to be an extra byte, 0x0c, before the palette. but, qME forgets this when exporting pcxes, so we'll
  * have to let it slide */
 /*	if (palette768[-1] != 0x0c)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: bad palette format");
-		return NULL;
-	}*/
+		return (out_error && (*out_error = msprintf("pcx: bad palette format"))), NULL;*/
 
 	image = image_alloc(header->xmax - header->xmin + 1, header->ymax - header->ymin + 1);
 	if (!image)
-	{
-		if (out_error)
-			*out_error = msprintf("pcx: out of memory");
-		return NULL;
-	}
+		return (out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
 
 	for (y = 0; y < header->ymax - header->ymin + 1; y++)
 	{
@@ -177,61 +131,58 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 	return image;
 }
 
-size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t filesize)
+bool_t image_pcx_save(const image_paletted_t *image, xbuf_t *xbuf, char **out_error)
 {
-	unsigned char *f;
-	pcx_header_t *header;
-	int x, y;
+	pcx_header_t header;
+	int bytes_per_line, x, y;
 
-	f = (unsigned char*)filedata;
+/* PCX requires scanline length to be a multiple of 2, so round up */
+	bytes_per_line = (image->width + 1) & ~1;
 
 /* write header */
-	header = (pcx_header_t*)f;
-	f += 128;
+	header.manufacturer = 0x0a;
+	header.version = 5;
+	header.encoding = 1;
+	header.bits_per_pixel = 8;
+	header.xmin = LittleShort(0);
+	header.ymin = LittleShort(0);
+	header.xmax = LittleShort(image->width - 1);
+	header.ymax = LittleShort(image->height - 1);
+	header.hres = LittleShort(72); /* hres and vres are dots-per-inch values, unused */
+	header.vres = LittleShort(72);
+	memcpy(header.palette, image->palette.rgb, 48); /* not useful */
+	header.reserved = 0;
+	header.color_planes = 1;
+	header.bytes_per_line = LittleShort(bytes_per_line);
+	header.palette_type = LittleShort(1); /* according to pcx specs the accepted values are 1 (colour/bw) and 2 (greyscale) */
+	memset(header.filler, 0, 58);
 
-	header->manufacturer = 0x0a;
-	header->version = 5;
-	header->encoding = 1;
-	header->bits_per_pixel = 8;
-	header->xmin = 0;
-	header->ymin = 0;
-	header->xmax = image->width - 1;
-	header->ymax = image->height - 1;
-	header->hres = 72; /* hres and vres are dots-per-inch values, unused */
-	header->vres = 72;
-	memcpy(header->palette, image->palette.rgb, 48); /* not useful */
-	header->reserved = 0;
-	header->color_planes = 1;
-	header->bytes_per_line = (image->width + 1) & ~1; /* round up to multiple of 2 */
-	header->palette_type = 1; /* according to pcx specs the accepted values are 1 (colour/bw) and 2 (greyscale) */
-	memset(header->filler, 0, 58);
-
-	swap_pcx_header(header);
+	xbuf_write_data(xbuf, sizeof(pcx_header_t), &header);
 
 /* write image */
 	for (y = 0; y < image->height; y++)
 	{
 		const unsigned char *pix = image->pixels + y * image->width;
 
-		for (x = 0; x < header->bytes_per_line; )
+		for (x = 0; x < bytes_per_line; )
 		{
 			unsigned char pix_x = (x < image->width) ? pix[x] : pix[image->width - 1];
 			int runlen;
 
-			for (runlen = 1; runlen < 63 && x + runlen < header->bytes_per_line; runlen++)
+			for (runlen = 1; runlen < 63 && x + runlen < bytes_per_line; runlen++)
 				if (pix_x != (((x + runlen) < image->width) ? pix[x + runlen] : pix[image->width - 1]))
 					break;
 
 			if (runlen == 1)
 			{
 				if ((pix_x & 0xc0) == 0xc0)
-					*f++ = 0xc1;
-				*f++ = pix_x;
+					xbuf_write_byte(xbuf, 0xc1);
+				xbuf_write_byte(xbuf, pix_x);
 			}
 			else
 			{
-				*f++ = 0xc0 | runlen;
-				*f++ = pix_x;
+				xbuf_write_byte(xbuf, 0xc0 | runlen);
+				xbuf_write_byte(xbuf, pix_x);
 			}
 
 			x += runlen;
@@ -239,9 +190,9 @@ size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t file
 	}
 
 /* write palette */
-	*f++ = 0x0c;
-	memcpy(f, image->palette.rgb, 768);
-	f += 768;
+	xbuf_write_byte(xbuf, 0x0c);
+	xbuf_write_data(xbuf, 768, image->palette.rgb);
 
-	return f - (unsigned char*)filedata;
+/* done */
+	return true;
 }

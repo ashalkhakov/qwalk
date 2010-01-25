@@ -176,14 +176,12 @@ void loadfont(void)
 	pixels = image->pixels;
 
 	for (y = 0; y < 128; y++)
+	for (x = 0; x < 128; x++, pixels += 4)
 	{
-		for (x = 0; x < 128; x++, pixels += 4)
-		{
-			pixels[0] = 0xff;
-			pixels[1] = 0xff;
-			pixels[2] = 0xff;
-			pixels[3] = y<96 && (font_chars[y/12*16+x/8][y%12] & (1<<(x%8))) ? 0xff : 0;
-		}
+		pixels[0] = 0xff;
+		pixels[1] = 0xff;
+		pixels[2] = 0xff;
+		pixels[3] = y<96 && (font_chars[y/12*16+x/8][y%12] & (1<<(x%8))) ? 0xff : 0;
 	}
 
 /* generate texcoords, taking into account that the image was padded from 128x96 to 128x128 */

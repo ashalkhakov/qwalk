@@ -679,63 +679,20 @@ void render(void)
 	SDL_GL_SwapBuffers();
 }
 
-model_t *loadmodel(const char *filename)
-{
-	void *filedata;
-	size_t filesize;
-	char *error;
-	model_t *model;
-
-	if (!loadfile(filename, &filedata, &filesize, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		return NULL;
-	}
-
-	model = (model_t*)qmalloc(sizeof(model_t));
-
-	if (!model_load(filename, filedata, filesize, model, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		qfree(model);
-		qfree(filedata);
-		return NULL;
-	}
-
-	qfree(filedata);
-
-	printf("Loaded %s.\n", filename);
-	return model;
-}
-
 bool_t replacetexture(const char *filename)
 {
-	void *filedata;
-	size_t filesize;
 	char *error;
 	image_rgba_t *image;
 	int i;
 	mesh_t *mesh;
 
-	if (!loadfile(filename, &filedata, &filesize, &error))
-	{
-		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
-		qfree(error);
-		return false;
-	}
-
-	image = image_load(filename, filedata, filesize, &error);
+	image = image_load_from_file(filename, &error);
 	if (!image)
 	{
 		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
 		qfree(error);
-		qfree(filedata);
 		return false;
 	}
-
-	qfree(filedata);
 
 /* clear old skins */
 	model_clear_skins(model);
@@ -812,6 +769,7 @@ void showfps(void)
 
 int main(int argc, char **argv)
 {
+	char *error;
 	bool_t done;
 	int i;
 	char texfilename[1024] = {0};
@@ -934,9 +892,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	model = loadmodel(infilename);
+	model = model_load_from_file(infilename, &error);
 	if (!model)
+	{
+		printf("Failed to load model: %s.\n", error);
+		qfree(error);
 		return 1;
+	}
+
+	printf("Loaded %s.\n", infilename);
 
 	if (g_frame >= 0 && g_frame >= model->num_frames)
 	{

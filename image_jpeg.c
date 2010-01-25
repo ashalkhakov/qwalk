@@ -514,7 +514,7 @@ static void JPEG_ErrorExit(j_common_ptr cinfo)
 	longjmp(error_in_jpeg, 1);
 }
 
-image_rgba_t *image_jpeg_load(void *filedata, size_t filesize, char **out_error)
+image_rgba_t *image_jpg_load(void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image = NULL;
 	struct jpeg_decompress_struct cinfo;

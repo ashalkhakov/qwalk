@@ -139,16 +139,21 @@ void model_clear_skins(model_t *model);
 
 /* note that the filedata pointer is not const, because it may be modified (most likely by byteswapping) */
 bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t *out_model, char **out_error);
+model_t *model_load_from_file(const char *filename, char **out_error);
+
+bool_t model_save(const char *filename, const model_t *model, char **out_error);
 
 bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 
-bool_t model_mdl_save(const model_t *model, void **out_data, size_t *out_size);
-bool_t model_md2_save(const model_t *model, void **out_data, size_t *out_size);
+bool_t model_mdl_save(const model_t *model, xbuf_t *xbuf, char **out_error);
+bool_t model_md2_save(const model_t *model, xbuf_t *xbuf, char **out_error);
 
 model_t *model_clone(const model_t *model);
 
 model_t *model_merge_meshes(const model_t *model);
+
+void model_facetize(model_t *model);
 
 #endif

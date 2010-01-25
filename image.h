@@ -41,6 +41,10 @@ typedef struct image_paletted_s
 } image_paletted_t;
 
 image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_load_from_file(const char *filename, char **out_error);
+
+bool_t image_save(const char *filename, const image_rgba_t *image, char **out_error);
+bool_t image_paletted_save(const char *filename, const image_paletted_t *image, char **out_error);
 
 image_rgba_t *image_alloc(int width, int height);
 void image_free(image_rgba_t **image);
@@ -50,10 +54,10 @@ image_rgba_t *image_clone(const image_rgba_t *source);
 
 image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error);
 image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error);
-image_rgba_t *image_jpeg_load(void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_jpg_load(void *filedata, size_t filesize, char **out_error);
 
-size_t image_pcx_save(const image_paletted_t *image, void *filedata, size_t filesize);
-size_t image_tga_save(const image_rgba_t *image, void *filedata, size_t filesize);
+bool_t image_pcx_save(const image_paletted_t *image, xbuf_t *xbuf, char **out_error);
+bool_t image_tga_save(const image_rgba_t *image, xbuf_t *xbuf, char **out_error);
 
 image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
 image_rgba_t *image_pad(const image_rgba_t *source, int width, int height);
