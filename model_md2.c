@@ -701,14 +701,16 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 
 			if (!mesh->skins[offset].components[SKIN_DIFFUSE])
 			{
-				printf("Model has missing skin.\n");
+				if (out_error)
+					*out_error = msprintf("Model has missing skin.");
 				model_free(model);
 				return false;
 			}
 
 			if (skinwidth && skinheight && (skinwidth != mesh->skins[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->skins[offset].components[SKIN_DIFFUSE]->height))
 			{
-				printf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size.\n");
+				if (out_error)
+					*out_error = msprintf("Model has skins of different sizes. Use -texwidth and -texheight to resize all images to the same size");
 				model_free(model);
 				return false;
 			}
@@ -727,7 +729,8 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 
 	if (!skinwidth || !skinheight)
 	{
-		printf("Model has no skin. Use -texwidth and -texheight to set the skin dimensions, or  -tex to import a skin.\n");
+		if (out_error)
+			*out_error = msprintf("Model has no skin. Use -texwidth and -texheight to set the skin dimensions, or -tex to import a skin");
 		model_free(model);
 		return false;
 	}
@@ -748,7 +751,8 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 	/* FIXME - this shouldn't be a fatal error */
 		if (!image_paletted_save(skinfilenames[i], pimage, &error))
 		{
-			printf("model_md2_save: failed to write %s: %s\n", skinfilenames[i], error);
+			if (out_error)
+				*out_error = msprintf("Failed to write %s: %s", skinfilenames[i], error);
 			qfree(error);
 			qfree(pimage);
 			for (j = 0; j < i; j++)
