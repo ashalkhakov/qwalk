@@ -34,6 +34,8 @@
 
 #include "global.h"
 
+bool_t g_force_yes = false; /* automatically choose "yes" for all confirms? */
+
 unsigned short SwapShort(unsigned short v)
 {
 	unsigned char b1 = v & 0xFF;
@@ -109,6 +111,12 @@ void strlcpy(char *dest, const char *src, size_t size)
 bool_t yesno(void)
 {
 	char buffer[16];
+
+	if (g_force_yes)
+	{
+		printf("y\n");
+		return true;
+	}
 
 	fgets(buffer, sizeof(buffer), stdin);
 

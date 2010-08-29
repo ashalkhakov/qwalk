@@ -224,6 +224,9 @@ int main(int argc, char **argv)
 "  -offsets_z #       set the offsets vector, which only exists in the MDL\n"
 "                     format and is not used by Quake. It's only supported here\n"
 "                     for reasons of completeness.\n"
+"  -force             force \"yes\" response to all confirmation requests\n"
+"                     regarding overwriting existing files or creating\n"
+"                     nonexistent paths.\n"
 		);
 		return 0;
 	}
@@ -369,6 +372,10 @@ int main(int argc, char **argv)
 			else if (!strcmp(argv[i], "-facet"))
 			{
 				facet = true;
+			}
+			else if (!strcmp(argv[i], "-force"))
+			{
+				g_force_yes = true;
 			}
 			else
 			{
