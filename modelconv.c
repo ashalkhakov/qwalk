@@ -197,6 +197,37 @@ int main(int argc, char **argv)
 	set_atexit_final_event(dumpleaks);
 	atexit(call_atexit_events);
 
+	if (argc == 1)
+	{
+		printf(
+"modelconv [options] -i infilename outfilename\n"
+"Output format is specified by the file extension of outfilename.\n"
+"Options:\n"
+"  -i filename        specify the model to load (required).\n"
+"  -notex             remove all existing skins from model after importing.\n"
+"  -tex filename      replace the model's texture with the given texture. This\n"
+"                     is required for any texture to be loaded onto MD2 or MD3\n"
+"                     models (the program doesn't automatically load external\n"
+"                     skins). Supported formats are PCX, TGA, and JPEG.\n"
+"  -texwidth #        see below\n"
+"  -texheight #       resample the model's texture to the given dimensions.\n"
+"  -skinpath x        specify the path that skins will be exported to when\n"
+"                     exporting to md2 (e.g. \"models/players\"). Should not\n"
+"                     contain trailing slash. If skinpath is not specified,\n"
+"                     skins will be created in the same folder as the model.\n"
+"  -flags #           set model flags, such as rocket smoke trail, rotate, etc.\n"
+"                     See Quake's defs.qc for a list of all flags.\n"
+"  -synctype x        set synctype flag, only used by Quake. The valid values\n"
+"                     are sync (default) and rand.\n"
+"  -offsets_x #       see below\n"
+"  -offsets_y #       see below\n"
+"  -offsets_z #       set the offsets vector, which only exists in the MDL\n"
+"                     format and is not used by Quake. It's only supported here\n"
+"                     for reasons of completeness.\n"
+		);
+		return 0;
+	}
+
 	for (i = 1; i < argc; i++)
 	{
 		if (argv[i][0] == '-')
