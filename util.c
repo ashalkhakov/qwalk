@@ -384,15 +384,21 @@ void dumpleaks(void)
 {
 	alloc_t *alloc, *next;
 
+#ifdef _DEBUG
 	printf("Peak memory allocated: %d bytes\n", peak_bytes);
+#endif
 
 	if (!alloc_head)
 		return;
 
+#ifdef _DEBUG
 	printf("Memory leak(s):\n");
+#endif
 	for (alloc = alloc_head; alloc; alloc = next)
 	{
+#ifdef _DEBUG
 		printf("%s (ln %d) (%d bytes)\n", alloc->file, alloc->line, alloc->numbytes);
+#endif
 		next = alloc->next;
 		free(alloc);
 	}
