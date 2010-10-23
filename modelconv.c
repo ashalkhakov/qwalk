@@ -191,7 +191,9 @@ int main(int argc, char **argv)
 	int flags = 0;
 	int synctype = 0;
 	float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
+	bool_t renormal = false;
 	bool_t facet = false;
+	bool_t rename_frames = false;
 	int i, j, k;
 
 	set_atexit_final_event(dumpleaks);
@@ -224,6 +226,8 @@ int main(int argc, char **argv)
 "  -offsets_z #       set the offsets vector, which only exists in the MDL\n"
 "                     format and is not used by Quake. It's only supported here\n"
 "                     for reasons of completeness.\n"
+"  -renormal          recalculate vertex normals.\n"
+"  -rename_frames     rename all frames to \"frame1\", \"frame2\", etc.\n"
 "  -force             force \"yes\" response to all confirmation requests\n"
 "                     regarding overwriting existing files or creating\n"
 "                     nonexistent paths.\n"
@@ -369,9 +373,17 @@ int main(int argc, char **argv)
 
 				offsets_z = (float)atof(argv[i]);
 			}
+			else if (!strcmp(argv[i], "-renormal"))
+			{
+				renormal = true;
+			}
 			else if (!strcmp(argv[i], "-facet"))
 			{
 				facet = true;
+			}
+			else if (!strcmp(argv[i], "-rename_frames"))
+			{
+				rename_frames = true;
 			}
 			else if (!strcmp(argv[i], "-force"))
 			{
@@ -446,10 +458,14 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (renormal)
+		model_recalculate_normals(model);
+
 	if (facet)
-	{
 		model_facetize(model);
-	}
+
+	if (rename_frames)
+		model_rename_frames(model);
 
 	if (!outfilename[0])
 	{

@@ -480,6 +480,50 @@ model_t *model_merge_meshes(const model_t *model)
 	return newmodel;
 }
 
+void model_recalculate_normals(model_t *model)
+{
+	int m, f, t, v;
+	mesh_t *mesh;
+
+	for (m = 0, mesh = model->meshes; m < model->num_meshes; m++, mesh++)
+	{
+	/* clear all normals */
+		memset(mesh->normal3f, 0, sizeof(float[3]) * mesh->num_vertices * model->total_frames);
+
+	/* add up all the unnormalized "normals" */
+		for (f = 0; f < model->total_frames; f++)
+		{
+			const int firstvertex = f * mesh->num_vertices * 3;
+			const int *tri;
+
+			for (tri = mesh->triangle3i, t = 0; t < mesh->num_triangles; tri += 3, t++)
+			{
+				const float *v0 = mesh->vertex3f + firstvertex + tri[0] * 3;
+				const float *v1 = mesh->vertex3f + firstvertex + tri[1] * 3;
+				const float *v2 = mesh->vertex3f + firstvertex + tri[2] * 3;
+				float *n0 = mesh->normal3f + firstvertex + tri[0] * 3;
+				float *n1 = mesh->normal3f + firstvertex + tri[1] * 3;
+				float *n2 = mesh->normal3f + firstvertex + tri[2] * 3;
+				float q[3], v[3], normal[3];
+
+			/* find the face normal but don't normalize it yet, so large faces contribute more to the vertex normal than small faces */
+				VectorSubtract(v1, v0, q);
+				VectorSubtract(v1, v2, v);
+				CrossProduct(q, v, normal);
+
+			/* add normal to the three vertices of this face */
+				VectorAdd(n0, normal, n0);
+				VectorAdd(n1, normal, n1);
+				VectorAdd(n2, normal, n2);
+			}
+
+		/* now go back and normalize all the normals */
+			for (v = 0; v < mesh->num_vertices; v++)
+				VectorNormalize(mesh->normal3f + firstvertex + v * 3);
+		}
+	}
+}
+
 void model_facetize(model_t *model)
 {
 	int i, j, k, f;
@@ -551,5 +595,32 @@ void model_facetize(model_t *model)
 		mesh->normal3f = normal3f;
 		mesh->texcoord2f = texcoord2f;
 		mesh->num_vertices = mesh->num_triangles * 3;
+	}
+}
+
+void model_rename_frames(model_t *model)
+{
+	int i, j;
+	frameinfo_t *frameinfo;
+	singleframe_t *singleframe;
+
+	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
+	{
+		if (frameinfo->num_frames == 1)
+		{
+			singleframe = frameinfo->frames;
+			if (singleframe->name)
+				qfree(singleframe->name);
+			singleframe->name = msprintf("frame%d", i + 1);
+		}
+		else
+		{
+			for (j = 0, singleframe = frameinfo->frames; j < frameinfo->num_frames; j++, singleframe++)
+			{
+				if (singleframe->name)
+					qfree(singleframe->name);
+				singleframe->name = msprintf("frame%d_%d", i + 1, j + 1);
+			}
+		}
 	}
 }

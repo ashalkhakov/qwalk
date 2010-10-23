@@ -154,6 +154,8 @@ model_t *model_clone(const model_t *model);
 
 model_t *model_merge_meshes(const model_t *model);
 
+void model_recalculate_normals(model_t *model);
 void model_facetize(model_t *model);
+void model_rename_frames(model_t *model);
 
 #endif
