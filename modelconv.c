@@ -189,8 +189,11 @@ int main(int argc, char **argv)
 	char skinpath[1024] = {0};
 	bool_t notex = false;
 	int flags = 0;
+	bool_t flags_specified = false;
 	int synctype = 0;
+	bool_t synctype_specified = false;
 	float offsets_x = 0.0f, offsets_y = 0.0f, offsets_z = 0.0f;
+	bool_t offsets_specified = false;
 	bool_t renormal = false;
 	bool_t facet = false;
 	bool_t rename_frames = false;
@@ -324,6 +327,7 @@ int main(int argc, char **argv)
 				}
 
 				flags = (int)atoi(argv[i]);
+				flags_specified = true;
 			}
 			else if (!strcmp(argv[i], "-synctype"))
 			{
@@ -342,6 +346,8 @@ int main(int argc, char **argv)
 					printf("%s: invalid value for option '-synctype' (accepted values: 'sync' (default), 'rand')\n", argv[0]);
 					return 0;
 				}
+
+				synctype_specified = true;
 			}
 			else if (!strcmp(argv[i], "-offsets_x"))
 			{
@@ -352,6 +358,7 @@ int main(int argc, char **argv)
 				}
 
 				offsets_x = (float)atof(argv[i]);
+				offsets_specified = true;
 			}
 			else if (!strcmp(argv[i], "-offsets_y"))
 			{
@@ -362,6 +369,7 @@ int main(int argc, char **argv)
 				}
 
 				offsets_y = (float)atof(argv[i]);
+				offsets_specified = true;
 			}
 			else if (!strcmp(argv[i], "-offsets_z"))
 			{
@@ -372,6 +380,7 @@ int main(int argc, char **argv)
 				}
 
 				offsets_z = (float)atof(argv[i]);
+				offsets_specified = true;
 			}
 			else if (!strcmp(argv[i], "-renormal"))
 			{
@@ -417,11 +426,16 @@ int main(int argc, char **argv)
 
 	printf("Loaded %s.\n", infilename);
 
-	model->flags = flags;
-	model->synctype = synctype;
-	model->offsets[0] = offsets_x;
-	model->offsets[1] = offsets_y;
-	model->offsets[2] = offsets_z;
+	if (flags_specified)
+		model->flags = flags;
+	if (synctype_specified)
+		model->synctype = synctype;
+	if (offsets_specified)
+	{
+		model->offsets[0] = offsets_x;
+		model->offsets[1] = offsets_y;
+		model->offsets[2] = offsets_z;
+	}
 
 	if (notex)
 	{
