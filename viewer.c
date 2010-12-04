@@ -47,6 +47,7 @@ float frametime = 0.1f;
 float cam_pitch = 0.0f;
 float cam_yaw = 180.0f;
 float cam_dist = 64.0f;
+float model_z = 0.0f;
 mat4x4f_t viewmatrix;
 mat4x4f_t invviewmatrix;
 
@@ -55,6 +56,10 @@ mat4x4f_t invmodelmatrix;
 bool_t mousedown = false;
 int mousedownx = 0;
 int mousedowny = 0;
+
+bool_t mouse2down = false;
+int mouse2downx = 0;
+int mouse2downy = 0;
 
 bool_t texturefiltering = false;
 bool_t firstperson = false;
@@ -88,14 +93,22 @@ void r_init(void);
 
 void frame(void)
 {
+	int x, y;
+
+	SDL_GetMouseState(&x, &y);
+
 	if (mousedown)
 	{
-		int x, y;
-		SDL_GetMouseState(&x, &y);
 		cam_yaw += (x - mousedownx);
 		cam_pitch -= (y - mousedowny);
 		mousedownx = x;
 		mousedowny = y;
+	}
+	if (mouse2down)
+	{
+		model_z += (y - mouse2downy);
+		mouse2downx = x;
+		mouse2downy = y;
 	}
 }
 
@@ -509,7 +522,8 @@ void render(void)
 	}
 
 /* create view matrix */
-	mat4x4f_create_rotate(&viewmatrix, -cam_yaw, 0, 0, 1);
+	mat4x4f_create_translate(&viewmatrix, 0, 0, model_z);
+	mat4x4f_concat_rotate(&viewmatrix, -cam_yaw, 0, 0, 1);
 	mat4x4f_concat_rotate(&viewmatrix, -cam_pitch, 0, 1, 0);
 	mat4x4f_concat_translate(&viewmatrix, -cam_dist, 0, 0);
 	setviewmatrix(&viewmatrix);
@@ -996,6 +1010,12 @@ int main(int argc, char **argv)
 					mousedownx = event.button.x;
 					mousedowny = event.button.y;
 				}
+				if (event.button.button == SDL_BUTTON_RIGHT)
+				{
+					mouse2down = true;
+					mouse2downx = event.button.x;
+					mouse2downy = event.button.y;
+				}
 				if (event.button.button == SDL_BUTTON_WHEELUP)
 					cam_dist -= 8.0f;
 				if (event.button.button == SDL_BUTTON_WHEELDOWN)
@@ -1005,6 +1025,10 @@ int main(int argc, char **argv)
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
 					mousedown = false;
+				}
+				if (event.button.button == SDL_BUTTON_RIGHT)
+				{
+					mouse2down = false;
 				}
 				break;
 			}
