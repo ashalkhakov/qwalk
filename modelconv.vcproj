@@ -217,6 +217,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\model_mdo.c"
+				>
+			</File>
+			<File
 				RelativePath=".\modelconv.c"
 				>
 			</File>

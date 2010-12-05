@@ -7,7 +7,7 @@ BASE_CFLAGS=-g -MD -Wall -pedantic
 
 CMD_RM=rm -f
 
-OBJECTS=anorms.o image.o image_jpeg.o image_pcx.o image_tga.o matrix.o model.o model_md2.o model_md3.o model_mdl.o palettes.o util.o
+OBJECTS=anorms.o image.o image_jpeg.o image_pcx.o image_tga.o matrix.o model.o model_md2.o model_md3.o model_mdl.o model_mdo.o palettes.o util.o
 
 help:
 	@echo "* make help : Show this message"

@@ -221,6 +221,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\model_mdo.c"
+				>
+			</File>
+			<File
 				RelativePath=".\palettes.c"
 				>
 			</File>

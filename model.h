@@ -143,6 +143,7 @@ model_t *model_load_from_file(const char *filename, char **out_error);
 
 bool_t model_save(const char *filename, const model_t *model, char **out_error);
 
+bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
 bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error);
