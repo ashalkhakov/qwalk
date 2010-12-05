@@ -171,6 +171,26 @@ void image_free(image_rgba_t **image)
 	*image = NULL;
 }
 
+image_paletted_t *image_paletted_alloc(int width, int height)
+{
+	image_paletted_t *image;
+	if (width < 1 || height < 1)
+		return NULL;
+	image = (image_paletted_t*)qmalloc(sizeof(image_paletted_t) + width * height);
+	if (!image)
+		return NULL;
+	image->width = width;
+	image->height = height;
+	image->pixels = (unsigned char*)(image + 1);
+	return image;
+}
+
+void image_paletted_free(image_paletted_t **image)
+{
+	qfree(*image);
+	*image = NULL;
+}
+
 image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
 	image_rgba_t *image;

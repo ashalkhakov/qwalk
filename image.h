@@ -49,9 +49,13 @@ bool_t image_paletted_save(const char *filename, const image_paletted_t *image, 
 image_rgba_t *image_alloc(int width, int height);
 void image_free(image_rgba_t **image);
 
+image_paletted_t *image_paletted_alloc(int width, int height);
+void image_paletted_free(image_paletted_t **image);
+
 image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 image_rgba_t *image_clone(const image_rgba_t *source);
 
+image_paletted_t *image_pcx_load_paletted(void *filedata, size_t filesize, char **out_error);
 image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error);
 image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error);
 image_rgba_t *image_jpg_load(void *filedata, size_t filesize, char **out_error);
