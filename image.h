@@ -40,32 +40,32 @@ typedef struct image_paletted_s
 	unsigned char *pixels;
 } image_paletted_t;
 
-image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error);
-image_rgba_t *image_load_from_file(const char *filename, char **out_error);
+image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_load_from_file(mem_pool_t *pool, const char *filename, char **out_error);
 
 bool_t image_save(const char *filename, const image_rgba_t *image, char **out_error);
 bool_t image_paletted_save(const char *filename, const image_paletted_t *image, char **out_error);
 
-image_rgba_t *image_alloc(int width, int height);
+image_rgba_t *image_alloc(mem_pool_t *pool, int width, int height);
 void image_free(image_rgba_t **image);
 
-image_paletted_t *image_paletted_alloc(int width, int height);
+image_paletted_t *image_paletted_alloc(mem_pool_t *pool, int width, int height);
 void image_paletted_free(image_paletted_t **image);
 
-image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
-image_rgba_t *image_clone(const image_rgba_t *source);
+image_rgba_t *image_createfill(mem_pool_t *pool, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+image_rgba_t *image_clone(mem_pool_t *pool, const image_rgba_t *source);
 
-image_paletted_t *image_pcx_load_paletted(void *filedata, size_t filesize, char **out_error);
-image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error);
-image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error);
-image_rgba_t *image_jpg_load(void *filedata, size_t filesize, char **out_error);
+image_paletted_t *image_pcx_load_paletted(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_pcx_load(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_tga_load(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error);
+image_rgba_t *image_jpg_load(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error);
 
 bool_t image_pcx_save(const image_paletted_t *image, xbuf_t *xbuf, char **out_error);
 bool_t image_tga_save(const image_rgba_t *image, xbuf_t *xbuf, char **out_error);
 
-image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
-image_rgba_t *image_pad(const image_rgba_t *source, int width, int height);
-image_rgba_t *image_resize(const image_rgba_t *source, int width, int height);
+image_paletted_t *image_palettize(mem_pool_t *pool, const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright);
+image_rgba_t *image_pad(mem_pool_t *pool, const image_rgba_t *source, int width, int height);
+image_rgba_t *image_resize(mem_pool_t *pool, const image_rgba_t *source, int width, int height);
 
 void image_drawpixel(image_rgba_t *image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
 void image_drawline(image_rgba_t *image, int x1, int y1, int x2, int y2, unsigned char r, unsigned char g, unsigned char b);

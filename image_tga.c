@@ -23,7 +23,7 @@
 #include "global.h"
 #include "image.h"
 
-image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
+image_rgba_t *image_tga_load(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
@@ -146,7 +146,7 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 			break;
 		}
 
-		image = image_alloc(width, height);
+		image = image_alloc(pool, width, height);
 		if (!image)
 		{
 			if (out_error)
@@ -263,7 +263,7 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 			return NULL;
 		}
 
-		image = image_alloc(width, height);
+		image = image_alloc(pool, width, height);
 		if (!image)
 		{
 			if (out_error)
@@ -357,7 +357,7 @@ image_rgba_t *image_tga_load(void *filedata, size_t filesize, char **out_error)
 			return NULL;
 		}
 
-		image = image_alloc(width, height);
+		image = image_alloc(pool, width, height);
 		if (!image)
 		{
 			if (out_error)

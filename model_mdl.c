@@ -461,8 +461,8 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.total_skins);
 	for (i = 0; i < model.total_skins; i++)
 	{
-		mesh->skins[i].components[SKIN_DIFFUSE] = image_alloc(header->skinwidth, header->skinheight);
-		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_DIFFUSE] = image_alloc(mem_globalpool, header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(mem_globalpool, header->skinwidth, header->skinheight);
 
 		for (j = 0; j < header->skinwidth * header->skinheight; j++)
 		{
@@ -544,7 +544,7 @@ bool_t model_mdl_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 		/* if fullbright texture is a different size, resample it to match the diffuse texture */
 			if (mesh->skins[offset].components[SKIN_FULLBRIGHT] && (mesh->skins[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->skins[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
 			{
-				image_rgba_t *image = image_resize(mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_rgba_t *image = image_resize(mem_globalpool, mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
 				image_free(&mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 				mesh->skins[offset].components[SKIN_FULLBRIGHT] = image;
 			}
@@ -568,7 +568,7 @@ bool_t model_mdl_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 		{
 			int offset = skininfo->skins[j].offset;
 
-			skinimages[offset] = image_palettize(&palette_quake, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
+			skinimages[offset] = image_palettize(mem_globalpool, &palette_quake, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 		}
 	}
 

@@ -181,21 +181,21 @@ static int mdo_count_skins(const mdo_header_t *header, unsigned char *f)
 	return total_skins;
 }
 
-static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigned char **fptr, char **out_error)
+static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, mem_pool_t *pool, unsigned char **fptr, char **out_error)
 {
 	unsigned char *f = *fptr;
 	mesh_t *mesh = &model->meshes[0];
 	skininfo_t *skininfo;
 	int num_strings;
 	int offset;
-	int i, j;
+	int i, j, k;
 
 	model->num_skins = header->bitmap_count;
-	model->skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model->num_skins);
+	model->skininfo = (skininfo_t*)mem_alloc(pool, sizeof(skininfo_t) * model->num_skins);
 
 	model->total_skins = mdo_count_skins(header, f);
 
-	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model->total_skins);
+	mesh->skins = (meshskin_t*)mem_alloc(pool, sizeof(meshskin_t) * model->total_skins);
 
 	offset = 0;
 
@@ -227,38 +227,29 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigne
 			skininfo->num_skins = skincount;
 		}
 
-		skininfo->skins = (singleskin_t*)qmalloc(sizeof(singleskin_t) * skininfo->num_skins);
+		skininfo->skins = (singleskin_t*)mem_alloc(pool, sizeof(singleskin_t) * skininfo->num_skins);
 
 	/* load the skins from the stream */
 		for (j = 0; j < skininfo->num_skins; j++, offset++)
 		{
 			image_paletted_t *image;
-			int size;
-			int k;
 			char *error;
 
-			size = mdo_read_int(&f);
+			int size = mdo_read_int(&f);
 
 		/* load skin from file */
-			image = image_pcx_load_paletted(f, size, &error);
+			image = image_pcx_load_paletted(pool, f, size, &error);
 			if (!image)
 			{
 				if (out_error)
 					*out_error = msprintf("failed to load skin: %s", error);
 				qfree(error);
-			// FIXME - free crap
 				return false;
 			}
 			else
 			{
 				if (image->width != header->bitmap_width || image->height != header->bitmap_height)
-				{
-					if (out_error)
-						*out_error = msprintf("failed to load skin: wrong size");
-				// FIXME - free crap
-					image_paletted_free(&image);
-					return false;
-				}
+					return (out_error && (*out_error = msprintf("failed to load skin: wrong size"))), false;
 
 				skininfo->skins[j].name = NULL; /* loaded later */
 				skininfo->skins[j].offset = offset;
@@ -297,8 +288,8 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigne
 			}
 
 		/* create 32-bit skin */
-			mesh->skins[offset].components[SKIN_DIFFUSE]    = image_alloc(header->bitmap_width, header->bitmap_height);
-			mesh->skins[offset].components[SKIN_FULLBRIGHT] = image_alloc(header->bitmap_width, header->bitmap_height);
+			mesh->skins[offset].components[SKIN_DIFFUSE]    = image_alloc(pool, header->bitmap_width, header->bitmap_height);
+			mesh->skins[offset].components[SKIN_FULLBRIGHT] = image_alloc(pool, header->bitmap_width, header->bitmap_height);
 
 			for (k = 0; k < header->bitmap_width * header->bitmap_height; k++)
 			{
@@ -332,7 +323,7 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigne
 				}
 			}
 
-			qfree(image);
+			image_paletted_free(&image);
 		}
 	}
 
@@ -340,21 +331,7 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigne
 	num_strings = mdo_read_int(&f);
 
 	if (num_strings < model->total_skins)
-	{
-		if (out_error)
-			*out_error = msprintf("number of skin names is less than total number of skins");
-	/* free a bunch of stuff... */
-		for (i = 0, skininfo = model->skininfo; i < header->bitmap_count; i++, skininfo++)
-			qfree(skininfo->skins);
-		for (i = 0; i < model->total_skins; i++)
-		{
-			image_free(&mesh->skins[i].components[SKIN_DIFFUSE]);
-			image_free(&mesh->skins[i].components[SKIN_FULLBRIGHT]);
-		}
-		qfree(mesh->skins);
-		qfree(model->skininfo);
-		return false;
-	}
+		return (out_error && (*out_error = msprintf("number of skin names is less than total number of skins"))), false;
 
 	for (i = 0, skininfo = model->skininfo; i < header->bitmap_count; i++, skininfo++)
 	{
@@ -367,7 +344,7 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, unsigne
 			string[length] = '\0';
 			f += length;
 
-			skininfo->skins[j].name = copystring(string);
+			skininfo->skins[j].name = mem_copystring(pool, string);
 		}
 	}
 
@@ -415,7 +392,7 @@ static int mdo_count_frames(const mdo_header_t *header, unsigned char *f)
 	return total_frames;
 }
 
-static void mdo_load_frames(const mdo_header_t *header, model_t *model, const meshvert_t *meshverts, unsigned char **fptr)
+static void mdo_load_frames(const mdo_header_t *header, model_t *model, const meshvert_t *meshverts, mem_pool_t *pool, unsigned char **fptr)
 {
 	unsigned char *f = *fptr;
 	mesh_t *mesh = &model->meshes[0];
@@ -425,14 +402,14 @@ static void mdo_load_frames(const mdo_header_t *header, model_t *model, const me
 	int i, j, k;
 
 	model->num_frames = header->frame_count;
-	model->frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model->num_frames);
+	model->frameinfo = (frameinfo_t*)mem_alloc(pool, sizeof(frameinfo_t) * model->num_frames);
 
 	model->total_frames = mdo_count_frames(header, f);
 
-	mesh->vertex3f = (float*)qmalloc(model->total_frames * sizeof(float) * mesh->num_vertices * 3);
-	mesh->normal3f = (float*)qmalloc(model->total_frames * sizeof(float) * mesh->num_vertices * 3);
+	mesh->vertex3f = (float*)mem_alloc(pool, model->total_frames * sizeof(float) * mesh->num_vertices * 3);
+	mesh->normal3f = (float*)mem_alloc(pool, model->total_frames * sizeof(float) * mesh->num_vertices * 3);
 
-	framevertstart = (unsigned char**)qmalloc(sizeof(unsigned char*) * model->total_frames);
+	framevertstart = (unsigned char**)mem_alloc(pool, sizeof(unsigned char*) * model->total_frames);
 
 	offset = 0;
 
@@ -466,7 +443,7 @@ static void mdo_load_frames(const mdo_header_t *header, model_t *model, const me
 			frameinfo->num_frames = framecount;
 		}
 
-		frameinfo->frames = (singleframe_t*)qmalloc(sizeof(singleframe_t) * frameinfo->num_frames);
+		frameinfo->frames = (singleframe_t*)mem_alloc(pool, sizeof(singleframe_t) * frameinfo->num_frames);
 
 		for (j = 0; j < frameinfo->num_frames; j++, offset++)
 		{
@@ -474,7 +451,7 @@ static void mdo_load_frames(const mdo_header_t *header, model_t *model, const me
 
 			mdo_read_frame(&f, &frame);
 
-			frameinfo->frames[j].name = copystring(frame.name);
+			frameinfo->frames[j].name = mem_copystring(pool, frame.name);
 			frameinfo->frames[j].offset = offset;
 
 			framevertstart[offset] = f;
@@ -509,7 +486,7 @@ static void mdo_load_frames(const mdo_header_t *header, model_t *model, const me
 		}
 	}
 
-	qfree(framevertstart);
+	mem_free(framevertstart);
 
 	*fptr = f;
 }
@@ -517,6 +494,7 @@ static void mdo_load_frames(const mdo_header_t *header, model_t *model, const me
 bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
+	mem_pool_t *pool;
 	model_t model;
 	mesh_t *mesh;
 	mdo_header_t header;
@@ -554,9 +532,13 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 	if (LittleLong(header.version) != 1)
 		return (out_error && (*out_error = msprintf("wrong format (version not 1)"))), false;
 
+/* allocate memory pool so we don't have to clean things up by hand if we have
+ * to return an error somewhere in the middle of this function... */
+	pool = mem_create_pool();
+
 /* create mesh */
 	model.num_meshes = 1;
-	model.meshes = (mesh_t*)qmalloc(sizeof(mesh_t));
+	model.meshes = (mesh_t*)mem_alloc(pool, sizeof(mesh_t));
 
 	model.num_tags = 0;
 	model.tags = NULL;
@@ -564,23 +546,22 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh = &model.meshes[0];
 	mesh_initialize(&model, mesh);
 
-	mesh->name = copystring("mdomesh");
+	mesh->name = mem_copystring(pool, "mdomesh");
 
 /* load skins */
-	if (!mdo_load_skins(&header, &model, &f, out_error))
+	if (!mdo_load_skins(&header, &model, pool, &f, out_error))
 	{
-		qfree(mesh->name);
-		qfree(model.meshes);
+		mem_free_pool(pool);
 		return false;
 	}
 
 /* load skin vertices */
-	mdostverts = (mdo_stvert_t*)qmalloc(sizeof(mdo_stvert_t) * header.skin_vertex_count);
+	mdostverts = (mdo_stvert_t*)mem_alloc(pool, sizeof(mdo_stvert_t) * header.skin_vertex_count);
 	for (i = 0; i < header.skin_vertex_count; i++)
 		mdo_read_stvert(&f, &mdostverts[i]);
 
 /* load triangles */
-	mdotriangles = (mdo_triangle_t*)qmalloc(sizeof(mdo_triangle_t) * header.triangle_count);
+	mdotriangles = (mdo_triangle_t*)mem_alloc(pool, sizeof(mdo_triangle_t) * header.triangle_count);
 	for (i = 0; i < header.triangle_count; i++)
 		mdo_read_triangle(&f, &mdotriangles[i]);
 
@@ -588,10 +569,10 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
  * normals (the MDO format, like MD2, stores separate arrays of vertices and
  * "skin vertices") */
 	mesh->num_triangles = header.triangle_count;
-	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
+	mesh->triangle3i = (int*)mem_alloc(pool, sizeof(int) * mesh->num_triangles * 3);
 
 	mesh->num_vertices = 0;
-	meshverts = (meshvert_t*)qmalloc(sizeof(meshvert_t) * mesh->num_triangles * 3);
+	meshverts = (meshvert_t*)mem_alloc(pool, sizeof(meshvert_t) * mesh->num_triangles * 3);
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
 		for (j = 0; j < 3; j++)
@@ -623,13 +604,13 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
-	qfree(mdostverts);
-	qfree(mdotriangles);
+	mem_free(mdostverts);
+	mem_free(mdotriangles);
 
 /* generate texcoords */
 /* note: the specific rounding and stuff is different from our mdl loader...
  * these values seem to better match the texture mapping in qme's renderer */
-	mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
+	mesh->texcoord2f = (float*)mem_alloc(pool, sizeof(float) * mesh->num_vertices * 2);
 	iwidth = 1.0f / max(1, header.bitmap_width - 1);
 	iheight = 1.0f / max(1, header.bitmap_height - 1);
 	for (i = 0; i < mesh->num_vertices; i++)
@@ -645,10 +626,12 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 	}
 
 /* load frames */
-	mdo_load_frames(&header, &model, meshverts, &f);
+	mdo_load_frames(&header, &model, meshverts, pool, &f);
 
 /* done */
-	qfree(meshverts);
+	mem_free(meshverts);
+
+	mem_merge_pool(pool);
 
 	model.flags = header.flags;
 	model.synctype = header.synctype;

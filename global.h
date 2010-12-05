@@ -58,11 +58,23 @@ typedef float vec3f_t[3];
 
 #define IS_POWER_OF_TWO(x) ((x) && !(((x)-1) & (x)))
 
+typedef struct mem_pool_s mem_pool_t;
+extern mem_pool_t *mem_globalpool;
+mem_pool_t *mem_create_pool_(const char *file, int line);
+#define mem_create_pool() mem_create_pool_(__FILE__,__LINE__)
+void mem_merge_pool(mem_pool_t *pool);
+void mem_free_pool_(mem_pool_t *pool, bool_t complain);
+#define mem_free_pool(pool) mem_free_pool_(pool,false)
+void *mem_alloc_(mem_pool_t *pool, size_t numbytes, const char *file, int line);
+#define mem_alloc(pool,numbytes) mem_alloc_(pool,numbytes,__FILE__,__LINE__)
+void mem_free(void *mem);
+void mem_init(void);
+void mem_shutdown(void);
 void *qmalloc_(size_t numbytes, const char *file, int line);
 #define qmalloc(numbytes) qmalloc_(numbytes, __FILE__, __LINE__)
 void qfree(void *mem);
-void dumpleaks(void);
 
+char *mem_copystring(mem_pool_t *pool, const char *string);
 char *copystring(const char *string);
 char *msprintf(const char *format, ...);
 void strlcpy(char *dest, const char *src, size_t size);

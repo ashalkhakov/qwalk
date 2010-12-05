@@ -47,7 +47,7 @@ static image_format_t get_image_format(const char *filename)
 	return IMGFMT_UNRECOGNIZED;
 }
 
-image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, char **out_error)
+image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata, size_t filesize, char **out_error)
 {
 	switch (get_image_format(filename))
 	{
@@ -56,13 +56,13 @@ image_rgba_t *image_load(const char *filename, void *filedata, size_t filesize, 
 		return (out_error && (*out_error = msprintf("missing file extension"))), NULL;
 	case IMGFMT_UNRECOGNIZED:
 		return (out_error && (*out_error = msprintf("unrecognized file extension"))), NULL;
-	case IMGFMT_PCX: return image_pcx_load(filedata, filesize, out_error);
-	case IMGFMT_TGA: return image_tga_load(filedata, filesize, out_error);
-	case IMGFMT_JPG: return image_jpg_load(filedata, filesize, out_error);
+	case IMGFMT_PCX: return image_pcx_load(pool, filedata, filesize, out_error);
+	case IMGFMT_TGA: return image_tga_load(pool, filedata, filesize, out_error);
+	case IMGFMT_JPG: return image_jpg_load(pool, filedata, filesize, out_error);
 	}
 }
 
-image_rgba_t *image_load_from_file(const char *filename, char **out_error)
+image_rgba_t *image_load_from_file(mem_pool_t *pool, const char *filename, char **out_error)
 {
 	void *filedata;
 	size_t filesize;
@@ -71,7 +71,7 @@ image_rgba_t *image_load_from_file(const char *filename, char **out_error)
 	if (!loadfile(filename, &filedata, &filesize, out_error))
 		return NULL;
 
-	image = image_load(filename, filedata, filesize, out_error);
+	image = image_load(pool, filename, filedata, filesize, out_error);
 
 	qfree(filedata);
 	return image;
@@ -151,12 +151,12 @@ bool_t image_paletted_save(const char *filename, const image_paletted_t *image, 
 	return xbuf_finish_file(xbuf, out_error);
 }
 
-image_rgba_t *image_alloc(int width, int height)
+image_rgba_t *image_alloc(mem_pool_t *pool, int width, int height)
 {
 	image_rgba_t *image;
 	if (width < 1 || height < 1)
 		return NULL;
-	image = (image_rgba_t*)qmalloc(sizeof(image_rgba_t) + width * height * 4);
+	image = (image_rgba_t*)mem_alloc(pool, sizeof(image_rgba_t) + width * height * 4);
 	if (!image)
 		return NULL;
 	image->width = width;
@@ -167,16 +167,16 @@ image_rgba_t *image_alloc(int width, int height)
 
 void image_free(image_rgba_t **image)
 {
-	qfree(*image);
+	mem_free(*image);
 	*image = NULL;
 }
 
-image_paletted_t *image_paletted_alloc(int width, int height)
+image_paletted_t *image_paletted_alloc(mem_pool_t *pool, int width, int height)
 {
 	image_paletted_t *image;
 	if (width < 1 || height < 1)
 		return NULL;
-	image = (image_paletted_t*)qmalloc(sizeof(image_paletted_t) + width * height);
+	image = (image_paletted_t*)mem_alloc(pool, sizeof(image_paletted_t) + width * height);
 	if (!image)
 		return NULL;
 	image->width = width;
@@ -187,16 +187,16 @@ image_paletted_t *image_paletted_alloc(int width, int height)
 
 void image_paletted_free(image_paletted_t **image)
 {
-	qfree(*image);
+	mem_free(*image);
 	*image = NULL;
 }
 
-image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+image_rgba_t *image_createfill(mem_pool_t *pool, int width, int height, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
 	image_rgba_t *image;
 	int i;
 
-	image = image_alloc(width, height);
+	image = image_alloc(pool, width, height);
 	if (!image)
 		return NULL;
 
@@ -211,14 +211,14 @@ image_rgba_t *image_createfill(int width, int height, unsigned char r, unsigned 
 	return image;
 }
 
-image_rgba_t *image_clone(const image_rgba_t *source)
+image_rgba_t *image_clone(mem_pool_t *pool, const image_rgba_t *source)
 {
 	image_rgba_t *image;
 
 	if (!source)
 		return NULL;
 
-	image = image_alloc(source->width, source->height);
+	image = image_alloc(pool, source->width, source->height);
 	if (!image)
 		return NULL;
 
@@ -249,7 +249,7 @@ static unsigned char palettize_colour(const palette_t *palette, bool_t fullbrigh
 	return (besti != -1) ? besti : 0;
 }
 
-image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright)
+image_paletted_t *image_palettize(mem_pool_t *pool, const palette_t *palette, const image_rgba_t *source_diffuse, const image_rgba_t *source_fullbright)
 {
 	bool_t palette_has_fullbrights;
 	image_paletted_t *pimage;
@@ -258,7 +258,7 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 	if (!source_diffuse && !source_fullbright)
 		return NULL;
 
-	pimage = (image_paletted_t*)qmalloc(sizeof(image_paletted_t) + source_diffuse->width * source_diffuse->height);
+	pimage = (image_paletted_t*)mem_alloc(pool, sizeof(image_paletted_t) + source_diffuse->width * source_diffuse->height);
 	if (!pimage)
 		return NULL;
 	pimage->width = source_diffuse->width;
@@ -303,17 +303,17 @@ image_paletted_t *image_palettize(const palette_t *palette, const image_rgba_t *
 }
 
 /* FIXME - rewrite the minification code... it's ugly, probably slow, and maybe also has some weighting issues */
-image_rgba_t *image_resize(const image_rgba_t *source, int newwidth, int newheight)
+image_rgba_t *image_resize(mem_pool_t *pool, const image_rgba_t *source, int newwidth, int newheight)
 {
 	image_rgba_t *intermediate;
 	image_rgba_t *image;
 	int x, y, i;
 
-	intermediate = image_alloc(newwidth, source->height);
+	intermediate = image_alloc(pool, newwidth, source->height);
 	if (!intermediate)
 		return NULL;
 
-	image = image_alloc(newwidth, newheight);
+	image = image_alloc(pool, newwidth, newheight);
 	if (!image)
 	{
 		image_free(&intermediate);
@@ -467,7 +467,7 @@ image_rgba_t *image_resize(const image_rgba_t *source, int newwidth, int newheig
 
 /* pad an image to a larger size. the edge pixels will be repeated instead of filled with black, to avoid any unwanted
  * bleeding if mipmapped and/or rendered with texture filtering. */
-image_rgba_t *image_pad(const image_rgba_t *source, int width, int height)
+image_rgba_t *image_pad(mem_pool_t *pool, const image_rgba_t *source, int width, int height)
 {
 	image_rgba_t *image;
 	const unsigned char *inpixels;
@@ -477,7 +477,7 @@ image_rgba_t *image_pad(const image_rgba_t *source, int width, int height)
 	if (width < source->width || height < source->height)
 		return NULL;
 
-	image = image_alloc(width, height);
+	image = image_alloc(pool, width, height);
 	if (!image)
 		return NULL;
 

@@ -172,7 +172,7 @@ void loadfont(void)
 	int x, y, i;
 
 /* generate the image for this font - since it's only 128x96, pad it to 128x128 */
-	image = image_alloc(128, 128);
+	image = image_alloc(mem_globalpool, 128, 128);
 	pixels = image->pixels;
 
 	for (y = 0; y < 128; y++)

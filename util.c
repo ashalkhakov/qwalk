@@ -71,15 +71,6 @@ float SwapFloat(float v)
 	return dat2.f;
 }
 
-char *copystring(const char *string)
-{
-	size_t size = strlen(string) + 1;
-	char *s = (char*)qmalloc(size);
-	if (s)
-		memcpy(s, string, size);
-	return s;
-}
-
 /* FIXME - do this properly */
 char *msprintf(const char *format, ...)
 {
@@ -311,34 +302,122 @@ bool_t writefile(const char *filename, const void *data, size_t size, char **out
 
 /* memory management wrappers (leak detection) */
 
-/*#define SENTINEL 0xDEADBEEF*/
+typedef struct mem_pool_s mem_pool_t;
 
-typedef struct alloc_s
+typedef struct mem_alloc_s
 {
-	unsigned int sentinel;
-
+	mem_pool_t *pool;
 	size_t numbytes;
 	const char *file;
 	int line;
 
-	struct alloc_s *prev, *next;
-} alloc_t;
+	struct mem_alloc_s *prev;
+	struct mem_alloc_s *next;
+} mem_alloc_t;
 
-static alloc_t *alloc_head = NULL, *alloc_tail = NULL;
+struct mem_pool_s
+{
+	const char *file;
+	int line;
+
+	mem_alloc_t *alloc_head;
+	mem_alloc_t *alloc_tail;
+
+	mem_pool_t *prev;
+	mem_pool_t *next;
+};
+
+static mem_pool_t *mem_pool_head;
+static mem_pool_t *mem_pool_tail;
+
+mem_pool_t *mem_globalpool;
+
 static size_t bytes_alloced = 0;
 static size_t peak_bytes = 0;
 
-void *qmalloc_(size_t numbytes, const char *file, int line)
+mem_pool_t *mem_create_pool_(const char *file, int line)
 {
-	alloc_t *alloc;
+	mem_pool_t *pool;
+
+	pool = (mem_pool_t*)malloc(sizeof(mem_pool_t));
+	if (!pool)
+		return NULL;
+
+	pool->file = file;
+	pool->line = line;
+
+	pool->alloc_head = NULL;
+	pool->alloc_tail = NULL;
+
+	pool->prev = mem_pool_tail;
+	if (pool->prev)
+		pool->prev->next = pool;
+	pool->next = NULL;
+	if (!mem_pool_head)
+		mem_pool_head = pool;
+	mem_pool_tail = pool;
+
+	return pool;
+}
+
+/* transfer the pool's allocs to the global pool then free the now-empty pool.
+ * this is pretty lame... */
+void mem_merge_pool(mem_pool_t *pool)
+{
+	mem_alloc_t *alloc;
+
+	for (alloc = pool->alloc_head; alloc; alloc = alloc->next)
+		alloc->pool = mem_globalpool;
+
+	if (!mem_globalpool->alloc_head)
+	{
+		mem_globalpool->alloc_head = pool->alloc_head;
+		mem_globalpool->alloc_tail = pool->alloc_tail;
+	}
+	else
+	{
+		mem_globalpool->alloc_tail->next = pool->alloc_head;
+		if (pool->alloc_head)
+			pool->alloc_head->prev = mem_globalpool->alloc_tail;
+		mem_globalpool->alloc_tail = pool->alloc_tail;
+	}
+
+	pool->alloc_head = NULL;
+	pool->alloc_tail = NULL;
+
+	mem_free_pool(pool);
+}
+
+void mem_free_pool_(mem_pool_t *pool, bool_t complain)
+{
+	mem_alloc_t *alloc, *nextalloc;
+
+	for (alloc = pool->alloc_head; alloc; alloc = nextalloc)
+	{
+		nextalloc = alloc->next;
+
+		if (complain)
+			printf("%s (ln %d) (%d bytes)\n", alloc->file, alloc->line, alloc->numbytes);
+		free(alloc);
+	}
+
+	if (pool->prev) pool->prev->next = pool->next;
+	if (pool->next) pool->next->prev = pool->prev;
+	if (mem_pool_head == pool) mem_pool_head = pool->next;
+	if (mem_pool_tail == pool) mem_pool_tail = pool->prev;
+
+	free(pool);
+}
+
+void *mem_alloc_(mem_pool_t *pool, size_t numbytes, const char *file, int line)
+{
+	mem_alloc_t *alloc;
 	void *mem;
 
 	if (!numbytes)
 		return NULL;
 
-/*	numbytes = (numbytes + 7) & ~7;*/
-
-	mem = malloc(sizeof(alloc_t) + numbytes);
+	mem = malloc(sizeof(mem_alloc_t) + numbytes);
 
 	if (!mem)
 		return NULL;
@@ -346,65 +425,90 @@ void *qmalloc_(size_t numbytes, const char *file, int line)
 	bytes_alloced += numbytes;
 	peak_bytes = max(peak_bytes, bytes_alloced);
 
-	alloc = (alloc_t*)mem;
+	alloc = (mem_alloc_t*)mem;
+	alloc->pool = pool;
 	alloc->numbytes = numbytes;
 	alloc->file = file;
 	alloc->line = line;
-	alloc->prev = alloc_tail;
+	alloc->prev = pool->alloc_tail;
 	alloc->next = NULL;
-	if (!alloc_head)
-		alloc_head = alloc;
+	if (!pool->alloc_head)
+		pool->alloc_head = alloc;
 	else
-		alloc_tail->next = alloc;
-	alloc_tail = alloc;
+		pool->alloc_tail->next = alloc;
+	pool->alloc_tail = alloc;
 
 	return alloc + 1;
 }
 
-void qfree(void *mem)
+void mem_free(void *mem)
 {
-	alloc_t *alloc;
+	mem_alloc_t *alloc;
 
 	if (!mem)
 		return;
 
-	alloc = (alloc_t*)mem - 1;
+	alloc = (mem_alloc_t*)mem - 1;
 
 	bytes_alloced -= alloc->numbytes;
 
 	if (alloc->prev) alloc->prev->next = alloc->next;
 	if (alloc->next) alloc->next->prev = alloc->prev;
-	if (alloc_head == alloc) alloc_head = alloc->next;
-	if (alloc_tail == alloc) alloc_tail = alloc->prev;
+	if (alloc->pool->alloc_head == alloc) alloc->pool->alloc_head = alloc->next;
+	if (alloc->pool->alloc_tail == alloc) alloc->pool->alloc_tail = alloc->prev;
 
 	free(alloc);
 }
 
-void dumpleaks(void)
+void *qmalloc_(size_t numbytes, const char *file, int line)
 {
-	alloc_t *alloc, *next;
+	return mem_alloc_(mem_globalpool, numbytes, file, line);
+}
+
+void qfree(void *mem)
+{
+	mem_free(mem);
+}
+
+char *mem_copystring(mem_pool_t *pool, const char *string)
+{
+	size_t size = strlen(string) + 1;
+	char *s = (char*)mem_alloc(pool, size);
+	if (s)
+		memcpy(s, string, size);
+	return s;
+}
+
+char *copystring(const char *string)
+{
+	return mem_copystring(mem_globalpool, string);
+}
+
+void mem_init(void)
+{
+	mem_globalpool = mem_create_pool();
+}
+
+void mem_shutdown(void)
+{
+	bool_t print_leaks;
+	mem_pool_t *pool;
 
 #ifdef _DEBUG
 	printf("Peak memory allocated: %d bytes\n", peak_bytes);
+	print_leaks = true;
+#else
+	print_leaks = false;
 #endif
 
-	if (!alloc_head)
-		return;
+	mem_free_pool_(mem_globalpool, print_leaks);
 
-#ifdef _DEBUG
-	printf("Memory leak(s):\n");
-#endif
-	for (alloc = alloc_head; alloc; alloc = next)
+	for (pool = mem_pool_head; pool; pool = pool->next)
 	{
-#ifdef _DEBUG
-		printf("%s (ln %d) (%d bytes)\n", alloc->file, alloc->line, alloc->numbytes);
-#endif
-		next = alloc->next;
-		free(alloc);
+		if (print_leaks)
+			printf("%s (ln %d) (pool)\n", pool->file, pool->line);
+		mem_free_pool_(pool, print_leaks);
 	}
-
-	alloc_head = NULL;
-	alloc_tail = NULL;
 }
 
 /* dll management (taken from darkplaces) */

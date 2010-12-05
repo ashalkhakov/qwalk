@@ -191,7 +191,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	/* try to load the image file mentioned in the md2 */
 	/* if any of the skins fail to load, they will be left as null */
-		image = image_load_from_file(md2skin->name, &error);
+		image = image_load_from_file(mem_globalpool, md2skin->name, &error);
 		if (!image)
 		{
 		/* this is a warning. FIXME - return warnings too, don't print them here */
@@ -720,7 +720,7 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 		/* if fullbright texture is a different size, resample it to match the diffuse texture */
 			if (mesh->skins[offset].components[SKIN_FULLBRIGHT] && (mesh->skins[offset].components[SKIN_FULLBRIGHT]->width != skinwidth || mesh->skins[offset].components[SKIN_FULLBRIGHT]->height != skinheight))
 			{
-				image_rgba_t *image = image_resize(mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
+				image_rgba_t *image = image_resize(mem_globalpool, mesh->skins[offset].components[SKIN_FULLBRIGHT], skinwidth, skinheight);
 				image_free(&mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 				mesh->skins[offset].components[SKIN_FULLBRIGHT] = image;
 			}
@@ -746,7 +746,7 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 
 		skinfilenames[i] = md2_create_skin_filename(skininfo->skins[0].name);
 
-		pimage = image_palettize(&palette_quake2, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
+		pimage = image_palettize(mem_globalpool, &palette_quake2, mesh->skins[offset].components[SKIN_DIFFUSE], mesh->skins[offset].components[SKIN_FULLBRIGHT]);
 
 	/* FIXME - this shouldn't be a fatal error */
 		if (!image_paletted_save(skinfilenames[i], pimage, &error))

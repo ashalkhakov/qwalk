@@ -700,7 +700,7 @@ bool_t replacetexture(const char *filename)
 	int i;
 	mesh_t *mesh;
 
-	image = image_load_from_file(filename, &error);
+	image = image_load_from_file(mem_globalpool, filename, &error);
 	if (!image)
 	{
 		fprintf(stderr, "Failed to load %s: %s.\n", filename, error);
@@ -724,7 +724,7 @@ bool_t replacetexture(const char *filename)
 	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
 	{
 		mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t));
-		mesh->skins[0].components[SKIN_DIFFUSE] = image_clone(image);
+		mesh->skins[0].components[SKIN_DIFFUSE] = image_clone(mem_globalpool, image);
 		mesh->skins[0].components[SKIN_FULLBRIGHT] = NULL;
 	}
 
@@ -791,7 +791,9 @@ int main(int argc, char **argv)
 	int width = 640, height = 480;
 	int bpp = 32;
 
-	set_atexit_final_event(dumpleaks);
+	mem_init();
+
+	set_atexit_final_event(mem_shutdown);
 	atexit(call_atexit_events);
 
 	for (i = 1; i < argc; i++)

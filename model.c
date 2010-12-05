@@ -110,7 +110,7 @@ void mesh_generaterenderdata(model_t *model, mesh_t *mesh)
 				}
 
 			/* pad the skin image */
-				mesh->renderdata.skins[i].components[j].image = image_pad(component, w, h);
+				mesh->renderdata.skins[i].components[j].image = image_pad(mem_globalpool, component, w, h);
 			}
 			else
 			{
@@ -389,7 +389,7 @@ model_t *model_clone(const model_t *model)
 		newmodel->meshes[i].skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model->total_skins);
 		for (j = 0; j < model->total_skins; j++)
 			for (k = 0; k < SKIN_NUMTYPES; k++)
-				newmodel->meshes[i].skins[j].components[k] = image_clone(model->meshes[i].skins[j].components[k]);
+				newmodel->meshes[i].skins[j].components[k] = image_clone(mem_globalpool, model->meshes[i].skins[j].components[k]);
 	}
 
 	return newmodel;
@@ -476,7 +476,7 @@ model_t *model_merge_meshes(const model_t *model)
 
 	for (i = 0; i < newmodel->total_skins; i++)
 		for (j = 0; j < SKIN_NUMTYPES; j++)
-			newmesh->skins[i].components[j] = image_clone(model->meshes[0].skins[i].components[j]);
+			newmesh->skins[i].components[j] = image_clone(mem_globalpool, model->meshes[0].skins[i].components[j]);
 
 	return newmodel;
 }

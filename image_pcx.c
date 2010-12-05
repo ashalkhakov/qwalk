@@ -86,7 +86,7 @@ static bool_t image_pcx_load_header(pcx_header_t *header, void *filedata, size_t
 	return true;
 }
 
-image_paletted_t *image_pcx_load_paletted(void *filedata, size_t filesize, char **out_error)
+image_paletted_t *image_pcx_load_paletted(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error)
 {
 	image_paletted_t *image;
 	unsigned char *f = (unsigned char*)filedata;
@@ -98,7 +98,7 @@ image_paletted_t *image_pcx_load_paletted(void *filedata, size_t filesize, char 
 
 	f += 128;
 
-	image = image_paletted_alloc(header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
+	image = image_paletted_alloc(pool, header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
 	if (!image)
 		return (out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
 
@@ -135,7 +135,7 @@ image_paletted_t *image_pcx_load_paletted(void *filedata, size_t filesize, char 
 	return image;
 }
 
-image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
+image_rgba_t *image_pcx_load(mem_pool_t *pool, void *filedata, size_t filesize, char **out_error)
 {
 	image_rgba_t *image;
 	unsigned char *f = (unsigned char*)filedata;
@@ -157,7 +157,7 @@ image_rgba_t *image_pcx_load(void *filedata, size_t filesize, char **out_error)
 /*	if (palette768[-1] != 0x0c)
 		return (out_error && (*out_error = msprintf("pcx: bad palette format"))), NULL;*/
 
-	image = image_alloc(header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
+	image = image_alloc(pool, header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
 	if (!image)
 		return (out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
 
