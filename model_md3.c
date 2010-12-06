@@ -62,7 +62,7 @@ typedef struct md3_header_s
 	int num_frames;
 	int num_tags;
 	int num_meshes;
-	int num_skins;
+	int num_skins; /* apparently unused */
 
 /* lump offsets are relative to start of header (start of file) */
 	int lump_frameinfo;
@@ -118,8 +118,6 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 	header->lump_tags      = LittleLong(header->lump_tags);
 	header->lump_meshes    = LittleLong(header->lump_meshes);
 	header->lump_end       = LittleLong(header->lump_end);
-
-/*	printf("header numskins: %d\n", header->num_skins);*/
 
 /* read skins */
 	model.total_skins = 0;
@@ -279,5 +277,224 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 	model.offsets[2] = 0.0f;
 
 	*out_model = model;
+	return true;
+}
+
+static unsigned short md3_encodenormal(const float n[3])
+{
+	int blat, blng;
+
+/* check for singularities */
+	if (n[0] == 0 && n[1] == 0)
+	{
+		if (n[2] > 0)
+		{
+			blat = 0;
+			blng = 0;
+		}
+		else
+		{
+			blat = 0;
+			blng = 128;
+		}
+	}
+	else
+	{
+		blat = (int)(atan2(n[1], n[0]) * (255.0 / (2 * M_PI)));
+		blng = (int)(acos(n[2]) * (255.0 / (2 * M_PI)));
+	}
+
+	return ((blat & 0xff) << 8) | (blng & 0xff);
+}
+
+bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
+{
+	md3_header_t header;
+	const frameinfo_t *frameinfo;
+	const tag_t *tag;
+	const mesh_t *mesh;
+	int i, j, k, m;
+
+	memcpy(header.ident, "IDP3", 4);
+	header.version    = LittleLong(15);
+	strlcpy(header.name, "md3model", sizeof(header.name));
+	header.flags      = LittleLong(model->flags);
+	header.num_frames = LittleLong(model->num_frames);
+	header.num_tags   = LittleLong(model->num_tags);
+	header.num_meshes = LittleLong(model->num_meshes);
+	header.num_skins  = LittleLong(model->num_skins);
+
+/* calculate lump offsets */
+	i = sizeof(md3_header_t);
+
+	header.lump_frameinfo = LittleLong(i);
+	i += sizeof(md3_frameinfo_t) * model->num_frames;
+
+	header.lump_tags = LittleLong(i);
+	i += sizeof(md3_tag_t) * model->num_frames * model->num_tags;
+
+	header.lump_meshes = i;
+	for (j = 0, mesh = model->meshes; j < model->num_meshes; j++, mesh++)
+	{
+		i += sizeof(md3_mesh_t); /* mesh header */
+		i += mesh->num_triangles * sizeof(int[3]); /* triangle elements */
+		/* FIXME - shaders? */
+		i += mesh->num_vertices * sizeof(float[2]); /* texcoords */
+		i += mesh->num_vertices * model->num_frames * sizeof(md3_vertex_t); /* framevertices */
+	}
+
+	header.lump_end = i;
+
+/* write header */
+	xbuf_write_data(xbuf, sizeof(md3_header_t), &header);
+
+/* write frameinfo */
+	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
+	{
+		const singleframe_t *singleframe = &frameinfo->frames[0];
+		md3_frameinfo_t md3_frameinfo;
+		float mins[3], maxs[3], dist[3];
+		bool_t first = true;
+
+		VectorClear(mins);
+		VectorClear(maxs);
+
+		for (j = 0, mesh = model->meshes; j < model->num_meshes; j++, mesh++)
+		{
+			const float *v = mesh->vertex3f + mesh->num_vertices * singleframe->offset * 3;
+
+			for (k = 0; k < mesh->num_vertices; k++, v += 3)
+			{
+				for (m = 0; m < 3; m++)
+				{
+					mins[m] = first ? v[m] : min(mins[m], v[m]);
+					maxs[m] = first ? v[m] : max(maxs[m], v[m]);
+					first = false;
+				}
+			}
+		}
+
+		for (m = 0; m < 3; m++)
+			dist[m] = (fabs(mins[m]) > fabs(maxs[m])) ? mins[m] : maxs[m];
+
+		VectorCopy(md3_frameinfo.mins, mins);
+		VectorCopy(md3_frameinfo.maxs, maxs);
+		VectorClear(md3_frameinfo.origin);
+		md3_frameinfo.radius = (float)sqrt(DotProduct(dist, dist));
+		strlcpy(md3_frameinfo.name, singleframe->name, sizeof(md3_frameinfo.name));
+
+		xbuf_write_data(xbuf, sizeof(md3_frameinfo_t), &md3_frameinfo);
+	}
+
+/* write tags */
+	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
+	{
+		for (j = 0, tag = model->tags; j < model->num_tags; j++, tag++)
+		{
+			int ofs = frameinfo->frames[0].offset;
+			md3_tag_t md3_tag;
+
+			strlcpy(md3_tag.name, tag->name, sizeof(md3_tag.name));
+
+			md3_tag.rotationmatrix[0] = LittleFloat(tag->matrix[ofs].m[0][0]);
+			md3_tag.rotationmatrix[3] = LittleFloat(tag->matrix[ofs].m[0][1]);
+			md3_tag.rotationmatrix[6] = LittleFloat(tag->matrix[ofs].m[0][2]);
+			md3_tag.origin[0] = LittleFloat(tag->matrix[ofs].m[0][3]);
+			md3_tag.rotationmatrix[1] = LittleFloat(tag->matrix[ofs].m[1][0]);
+			md3_tag.rotationmatrix[4] = LittleFloat(tag->matrix[ofs].m[1][1]);
+			md3_tag.rotationmatrix[7] = LittleFloat(tag->matrix[ofs].m[1][2]);
+			md3_tag.origin[1] = LittleFloat(tag->matrix[ofs].m[1][3]);
+			md3_tag.rotationmatrix[2] = LittleFloat(tag->matrix[ofs].m[2][0]);
+			md3_tag.rotationmatrix[5] = LittleFloat(tag->matrix[ofs].m[2][1]);
+			md3_tag.rotationmatrix[8] = LittleFloat(tag->matrix[ofs].m[2][2]);
+			md3_tag.origin[2] = LittleFloat(tag->matrix[ofs].m[2][3]);
+
+			xbuf_write_data(xbuf, sizeof(md3_tag_t), &md3_tag);
+		}
+	}
+
+/* write meshes */
+	for (i = 0, mesh = model->meshes; i < model->num_meshes; i++, mesh++)
+	{
+		md3_mesh_t md3_mesh;
+
+		memcpy(md3_mesh.ident, "IDP3", 4);
+		strlcpy(md3_mesh.name, mesh->name, sizeof(md3_mesh.name));
+		md3_mesh.flags = 0; /* unused */
+
+		md3_mesh.num_frames = LittleLong(model->num_frames);
+		md3_mesh.num_shaders = 0; // FIXME - TODO
+		md3_mesh.num_vertices = LittleLong(mesh->num_vertices);
+		md3_mesh.num_triangles = LittleLong(mesh->num_triangles);
+
+		j = sizeof(md3_mesh_t);
+
+		md3_mesh.lump_elements = j;
+		j += mesh->num_triangles * sizeof(int[3]);
+
+		md3_mesh.lump_shaders = j;
+		j += 0; // FIXME - TODO
+
+		md3_mesh.lump_texcoords = j;
+		j += mesh->num_vertices * sizeof(float[2]);
+
+		md3_mesh.lump_framevertices = j;
+		j += mesh->num_vertices * model->num_frames * sizeof(md3_vertex_t);
+
+		md3_mesh.lump_end = j;
+
+		xbuf_write_data(xbuf, sizeof(md3_mesh_t), &md3_mesh);
+
+	/* write triangles */
+		for (j = 0; j < mesh->num_triangles; j++)
+		{
+			int triangle[3];
+
+			triangle[0] = LittleLong(mesh->triangle3i[j*3+0]);
+			triangle[1] = LittleLong(mesh->triangle3i[j*3+1]);
+			triangle[2] = LittleLong(mesh->triangle3i[j*3+2]);
+
+			xbuf_write_data(xbuf, sizeof(triangle), triangle);
+		}
+
+	/* write shaders */
+		// FIXME - TODO
+
+	/* write texcoords */
+		for (j = 0; j < mesh->num_vertices; j++)
+		{
+			float texcoord[2];
+
+			texcoord[0] = LittleFloat(mesh->texcoord2f[j*2+0]);
+			texcoord[1] = LittleFloat(mesh->texcoord2f[j*2+1]);
+
+			xbuf_write_data(xbuf, sizeof(texcoord), texcoord);
+		}
+
+	/* write framevertices */
+		for (j = 0, frameinfo = model->frameinfo; j < model->num_frames; j++, frameinfo++)
+		{
+			const singleframe_t *singleframe = &frameinfo->frames[0];
+			const float *v = mesh->vertex3f + singleframe->offset * mesh->num_vertices * 3;
+			const float *n = mesh->normal3f + singleframe->offset * mesh->num_vertices * 3;
+
+			for (k = 0; k < mesh->num_vertices; k++, v += 3, n += 3)
+			{
+				md3_vertex_t md3_vertex;
+
+				int x = (int)(v[0] * 64.0f);
+				int y = (int)(v[1] * 64.0f);
+				int z = (int)(v[2] * 64.0f);
+
+				md3_vertex.origin[0] = LittleShort(bound(-32768, x, 32767));
+				md3_vertex.origin[1] = LittleShort(bound(-32768, y, 32767));
+				md3_vertex.origin[2] = LittleShort(bound(-32768, z, 32767));
+				md3_vertex.normalpitchyaw = md3_encodenormal(n);
+
+				xbuf_write_data(xbuf, sizeof(md3_vertex_t), &md3_vertex);
+			}
+		}
+	}
+
 	return true;
 }

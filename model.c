@@ -35,7 +35,7 @@ static model_format_t model_formats[] =
 {
 	{ "MDL", ".mdl", model_mdl_load, model_mdl_save },
 	{ "MD2", ".md2", model_md2_load, model_md2_save },
-	{ "MD3", ".md3", model_md3_load, NULL },
+	{ "MD3", ".md3", model_md3_load, model_md3_save },
 	{ "MDO", ".mdo", model_mdo_load, NULL }
 };
 
