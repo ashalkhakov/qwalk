@@ -244,9 +244,9 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		{
 			double npitch, nyaw;
 
-			mesh->vertex3f[j*3+0] = LittleShort(md3_vertex->origin[0]) * (1.0f / 64.0f);
-			mesh->vertex3f[j*3+1] = LittleShort(md3_vertex->origin[1]) * (1.0f / 64.0f);
-			mesh->vertex3f[j*3+2] = LittleShort(md3_vertex->origin[2]) * (1.0f / 64.0f);
+			mesh->vertex3f[j*3+0] = (signed short)LittleShort(md3_vertex->origin[0]) * (1.0f / 64.0f);
+			mesh->vertex3f[j*3+1] = (signed short)LittleShort(md3_vertex->origin[1]) * (1.0f / 64.0f);
+			mesh->vertex3f[j*3+2] = (signed short)LittleShort(md3_vertex->origin[2]) * (1.0f / 64.0f);
 
 		/* decompress the vertex normal */
 			md3_vertex->normalpitchyaw = LittleShort(md3_vertex->normalpitchyaw);
