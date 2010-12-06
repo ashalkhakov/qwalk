@@ -71,19 +71,6 @@ float SwapFloat(float v)
 	return dat2.f;
 }
 
-/* FIXME - do this properly */
-char *msprintf(const char *format, ...)
-{
-	va_list ap;
-	static char buffer[16384];
-
-	va_start(ap, format);
-	vsprintf(buffer, format, ap);
-	va_end(ap);
-
-	return copystring(buffer);
-}
-
 void strlcpy(char *dest, const char *src, size_t size)
 {
 	size_t i;
@@ -482,6 +469,31 @@ char *mem_copystring(mem_pool_t *pool, const char *string)
 char *copystring(const char *string)
 {
 	return mem_copystring(mem_globalpool, string);
+}
+
+/* FIXME - do this properly */
+char *mem_sprintf(mem_pool_t *pool, const char *format, ...)
+{
+	va_list ap;
+	static char buffer[16384];
+
+	va_start(ap, format);
+	vsprintf(buffer, format, ap);
+	va_end(ap);
+
+	return mem_copystring(pool, buffer);
+}
+
+char *msprintf(const char *format, ...)
+{
+	va_list ap;
+	static char buffer[16384];
+
+	va_start(ap, format);
+	vsprintf(buffer, format, ap);
+	va_end(ap);
+
+	return copystring(buffer);
 }
 
 void mem_init(void)

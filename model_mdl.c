@@ -128,6 +128,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	} mdl_meshvert_t;
 
 	unsigned char *f = (unsigned char*)filedata;
+	mem_pool_t *pool;
 	const unsigned char *tf;
 	mdl_header_t *header;
 	int i, j, k, offset;
@@ -150,6 +151,8 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		return (out_error && (*out_error = msprintf("wrong format (not IDPO)"))), false;
 	if (LittleLong(header->version) != 6)
 		return (out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
+
+	pool = mem_create_pool();
 
 /* byteswap header */
 	header->version    = LittleLong(header->version);
@@ -205,13 +208,13 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* read skins */
 	model.num_skins = header->numskins;
-	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+	model.skininfo = (skininfo_t*)mem_alloc(pool, sizeof(skininfo_t) * model.num_skins);
 
 	model.total_skins = total_skins;
 
 	offset = 0;
 
-	skintexstart = (unsigned char**)qmalloc(sizeof(unsigned char*) * model.total_skins);
+	skintexstart = (unsigned char**)mem_alloc(pool, sizeof(unsigned char*) * model.total_skins);
 	for (i = 0, skininfo = model.skininfo; i < header->numskins; i++, skininfo++)
 	{
 		daliasskintype_t *skintype = (daliasskintype_t*)f;
@@ -242,11 +245,11 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			skininfo->num_skins = LittleLong(group->numskins);
 		}
 
-		skininfo->skins = (singleskin_t*)qmalloc(sizeof(singleskin_t) * skininfo->num_skins);
+		skininfo->skins = (singleskin_t*)mem_alloc(pool, sizeof(singleskin_t) * skininfo->num_skins);
 
 		for (j = 0; j < skininfo->num_skins; j++)
 		{
-			skininfo->skins[j].name = msprintf("skin%d", offset);
+			skininfo->skins[j].name = mem_sprintf(pool, "skin%d", offset);
 			skininfo->skins[j].offset = offset;
 
 			skintexstart[offset] = f;
@@ -309,13 +312,13 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* read frames */
 	model.num_frames = header->numframes;
-	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
+	model.frameinfo = (frameinfo_t*)mem_alloc(pool, sizeof(frameinfo_t) * model.num_frames);
 
 	model.total_frames = total_frames;
 
 	offset = 0;
 
-	framevertstart = (trivertx_t**)qmalloc(sizeof(trivertx_t*) * model.total_frames);
+	framevertstart = (trivertx_t**)mem_alloc(pool, sizeof(trivertx_t*) * model.total_frames);
 	for (i = 0, frameinfo = model.frameinfo; i < header->numframes; i++, frameinfo++)
 	{
 		daliasframetype_t *frametype = (daliasframetype_t*)f;
@@ -346,7 +349,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			frameinfo->num_frames = LittleLong(group->numframes);
 		}
 
-		frameinfo->frames = (singleframe_t*)qmalloc(sizeof(singleframe_t) * frameinfo->num_frames);
+		frameinfo->frames = (singleframe_t*)mem_alloc(pool, sizeof(singleframe_t) * frameinfo->num_frames);
 
 		for (j = 0; j < frameinfo->num_frames; j++)
 		{
@@ -354,7 +357,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 			f += sizeof(daliasframe_t);
 
 			frameinfo->frames[j].offset = offset;
-			frameinfo->frames[j].name = copystring(sframe->name);
+			frameinfo->frames[j].name = mem_copystring(pool, sframe->name);
 
 			framevertstart[offset] = (trivertx_t*)f;
 			f += header->numverts * sizeof(trivertx_t);
@@ -364,7 +367,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	}
 
 	model.num_meshes = 1;
-	model.meshes = (mesh_t*)qmalloc(sizeof(mesh_t));
+	model.meshes = (mesh_t*)mem_alloc(pool, sizeof(mesh_t));
 
 	model.num_tags = 0;
 	model.tags = NULL;
@@ -378,13 +381,13 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh = &model.meshes[0];
 	mesh_initialize(&model, mesh);
 
-	mesh->name = copystring("mdlmesh");
+	mesh->name = mem_copystring(pool, "mdlmesh");
 
 	mesh->num_triangles = header->numtris;
-	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
+	mesh->triangle3i = (int*)mem_alloc(pool, sizeof(int) * mesh->num_triangles * 3);
 
 	mesh->num_vertices = 0;
-	meshverts = (mdl_meshvert_t*)qmalloc(sizeof(mdl_meshvert_t) * mesh->num_triangles * 3);
+	meshverts = (mdl_meshvert_t*)mem_alloc(pool, sizeof(mdl_meshvert_t) * mesh->num_triangles * 3);
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
 		for (j = 0; j < 3; j++)
@@ -415,7 +418,7 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
-	mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
+	mesh->texcoord2f = (float*)mem_alloc(pool, sizeof(float) * mesh->num_vertices * 2);
 	iwidth = 1.0f / header->skinwidth;
 	iheight = 1.0f / header->skinheight;
 	for (i = 0; i < mesh->num_vertices; i++)
@@ -430,8 +433,8 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		mesh->texcoord2f[i*2+1] = (t + 0.5f) * iheight;
 	}
 
-	mesh->vertex3f = (float*)qmalloc(model.total_frames * sizeof(float) * mesh->num_vertices * 3);
-	mesh->normal3f = (float*)qmalloc(model.total_frames * sizeof(float) * mesh->num_vertices * 3);
+	mesh->vertex3f = (float*)mem_alloc(pool, model.total_frames * sizeof(float) * mesh->num_vertices * 3);
+	mesh->normal3f = (float*)mem_alloc(pool, model.total_frames * sizeof(float) * mesh->num_vertices * 3);
 	for (i = 0; i < model.num_frames; i++)
 	{
 		for (j = 0; j < model.frameinfo[i].num_frames; j++)
@@ -455,14 +458,14 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
-	qfree(meshverts);
-	qfree(framevertstart);
+	mem_free(meshverts);
+	mem_free(framevertstart);
 
-	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.total_skins);
+	mesh->skins = (meshskin_t*)mem_alloc(pool, sizeof(meshskin_t) * model.total_skins);
 	for (i = 0; i < model.total_skins; i++)
 	{
-		mesh->skins[i].components[SKIN_DIFFUSE] = image_alloc(mem_globalpool, header->skinwidth, header->skinheight);
-		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(mem_globalpool, header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_DIFFUSE]    = image_alloc(pool, header->skinwidth, header->skinheight);
+		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(pool, header->skinwidth, header->skinheight);
 
 		for (j = 0; j < header->skinwidth * header->skinheight; j++)
 		{
@@ -497,7 +500,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
-	qfree(skintexstart);
+	mem_free(skintexstart);
+
+	mem_merge_pool(pool);
 
 	*out_model = model;
 	return true;

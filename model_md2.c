@@ -94,6 +94,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	} md2_meshvert_t;
 
 	unsigned char * const f = (unsigned char*)filedata;
+	mem_pool_t *pool;
 	md2_header_t *header;
 	int i, j;
 	model_t model;
@@ -111,6 +112,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		return (out_error && (*out_error = msprintf("wrong format (not IDP2)"))), false;
 	if (LittleLong(header->version) != 8)
 		return (out_error && (*out_error = msprintf("wrong format (version not 8)"))), false;
+
+	pool = mem_create_pool();
 
 /* byteswap file */
 	header->version       = LittleLong(header->version);
@@ -133,7 +136,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 /* stuff */
 	model.total_skins = header->num_skins;
 	model.num_skins = header->num_skins;
-	model.skininfo = (skininfo_t*)qmalloc(sizeof(skininfo_t) * model.num_skins);
+	model.skininfo = (skininfo_t*)mem_alloc(pool, sizeof(skininfo_t) * model.num_skins);
 
 	for (i = 0, skininfo = model.skininfo; i < model.num_skins; i++, skininfo++)
 	{
@@ -141,14 +144,14 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		skininfo->frametime = 0.1f;
 		skininfo->num_skins = 1;
-		skininfo->skins = (singleskin_t*)qmalloc(sizeof(skininfo_t));
-		skininfo->skins[0].name = copystring(md2skin->name);
+		skininfo->skins = (singleskin_t*)mem_alloc(pool, sizeof(skininfo_t));
+		skininfo->skins[0].name = mem_copystring(pool, md2skin->name);
 		skininfo->skins[0].offset = i;
 	}
 
 	model.total_frames = header->num_frames;
 	model.num_frames = header->num_frames;
-	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
+	model.frameinfo = (frameinfo_t*)mem_alloc(pool, sizeof(frameinfo_t) * model.num_frames);
 
 	for (i = 0, frameinfo = model.frameinfo; i < model.num_frames; i++, frameinfo++)
 	{
@@ -156,13 +159,13 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		frameinfo->frametime = 0.1f;
 		frameinfo->num_frames = 1;
-		frameinfo->frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		frameinfo->frames[0].name = copystring(md2frame->name);
+		frameinfo->frames = (singleframe_t*)mem_alloc(pool, sizeof(singleframe_t));
+		frameinfo->frames[0].name = mem_copystring(pool, md2frame->name);
 		frameinfo->frames[0].offset = i;
 	}
 
 	model.num_meshes = 1;
-	model.meshes = (mesh_t*)qmalloc(sizeof(mesh_t));
+	model.meshes = (mesh_t*)mem_alloc(pool, sizeof(mesh_t));
 
 	model.num_tags = 0;
 	model.tags = NULL;
@@ -176,10 +179,10 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	mesh = &model.meshes[0];
 	mesh_initialize(&model, mesh);
 
-	mesh->name = copystring("md2mesh");
+	mesh->name = mem_copystring(pool, "md2mesh");
 
 /* read skins */
-	mesh->skins = (meshskin_t*)qmalloc(sizeof(meshskin_t) * model.num_skins);
+	mesh->skins = (meshskin_t*)mem_alloc(pool, sizeof(meshskin_t) * model.num_skins);
 	for (i = 0; i < model.num_skins; i++)
 	{
 		const md2_skin_t *md2skin = (const md2_skin_t*)(f + header->offset_skins) + i;
@@ -191,7 +194,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 	/* try to load the image file mentioned in the md2 */
 	/* if any of the skins fail to load, they will be left as null */
-		image = image_load_from_file(mem_globalpool, md2skin->name, &error);
+		image = image_load_from_file(pool, md2skin->name, &error);
 		if (!image)
 		{
 		/* this is a warning. FIXME - return warnings too, don't print them here */
@@ -205,10 +208,10 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* read triangles */
 	mesh->num_triangles = header->num_tris;
-	mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
+	mesh->triangle3i = (int*)mem_alloc(pool, sizeof(int) * mesh->num_triangles * 3);
 
 	mesh->num_vertices = 0;
-	meshverts = (md2_meshvert_t*)qmalloc(sizeof(md2_meshvert_t) * mesh->num_triangles * 3);
+	meshverts = (md2_meshvert_t*)mem_alloc(pool, sizeof(md2_meshvert_t) * mesh->num_triangles * 3);
 	for (i = 0; i < mesh->num_triangles; i++)
 	{
 		const dtriangle_t *dtriangle = (const dtriangle_t*)(f + header->offset_tris) + i;
@@ -240,7 +243,7 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	}
 
 /* read texcoords */
-	mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
+	mesh->texcoord2f = (float*)mem_alloc(pool, sizeof(float) * mesh->num_vertices * 2);
 	iwidth = 1.0f / header->skinwidth;
 	iheight = 1.0f / header->skinheight;
 	for (i = 0; i < mesh->num_vertices; i++)
@@ -251,8 +254,8 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 	}
 
 /* read frames */
-	v = mesh->vertex3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
-	n = mesh->normal3f = (float*)qmalloc(model.num_frames * sizeof(float) * mesh->num_vertices * 3);
+	v = mesh->vertex3f = (float*)mem_alloc(pool, model.num_frames * sizeof(float) * mesh->num_vertices * 3);
+	n = mesh->normal3f = (float*)mem_alloc(pool, model.num_frames * sizeof(float) * mesh->num_vertices * 3);
 	for (i = 0; i < model.num_frames; i++)
 	{
 		const daliasframe_t *frame = (const daliasframe_t*)(f + header->offset_frames + i * header->framesize);
@@ -278,7 +281,9 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 	}
 
-	qfree(meshverts);
+	mem_free(meshverts);
+
+	mem_merge_pool(pool);
 
 	*out_model = model;
 	return true;
@@ -674,7 +679,7 @@ static void md2_build_glcmds(const dstvert_t *texcoords, int skinwidth, int skin
 	qfree(used);
 }
 
-bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error) /* FIXME - return errors instead of printfing them */
+bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 {
 	char *error;
 	int skinwidth, skinheight;

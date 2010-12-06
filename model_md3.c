@@ -95,6 +95,7 @@ typedef struct md3_mesh_s
 bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
+	mem_pool_t *pool;
 	md3_header_t *header;
 	int i, j;
 	model_t model;
@@ -106,6 +107,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		return (out_error && (*out_error = msprintf("wrong format (not IDP3)"))), false;
 	if (LittleLong(header->version) != 15)
 		return (out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
+
+	pool = mem_create_pool();
 
 /* byteswap header */
 	header->version        = LittleLong(header->version);
@@ -128,7 +131,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 	model.total_frames = header->num_frames;
 
 	model.num_frames = header->num_frames;
-	model.frameinfo = (frameinfo_t*)qmalloc(sizeof(frameinfo_t) * model.num_frames);
+	model.frameinfo = (frameinfo_t*)mem_alloc(pool, sizeof(frameinfo_t) * model.num_frames);
 
 	f = (unsigned char*)filedata + header->lump_frameinfo;
 	for (i = 0; i < model.num_frames; i++)
@@ -137,8 +140,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		model.frameinfo[i].frametime = 0.1f;
 		model.frameinfo[i].num_frames = 1;
-		model.frameinfo[i].frames = (singleframe_t*)qmalloc(sizeof(singleframe_t));
-		model.frameinfo[i].frames[0].name = copystring(md3_frameinfo->name);
+		model.frameinfo[i].frames = (singleframe_t*)mem_alloc(pool, sizeof(singleframe_t));
+		model.frameinfo[i].frames[0].name = mem_copystring(pool, md3_frameinfo->name);
 		model.frameinfo[i].frames[0].offset = i;
 
 		f += sizeof(md3_frameinfo_t);
@@ -146,11 +149,11 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* read tags */
 	model.num_tags = header->num_tags;
-	model.tags = (tag_t*)qmalloc(sizeof(tag_t) * model.num_tags);
+	model.tags = (tag_t*)mem_alloc(pool, sizeof(tag_t) * model.num_tags);
 
 	f = (unsigned char*)filedata + header->lump_tags;
 	for (i = 0; i < header->num_tags; i++)
-		model.tags[i].matrix = (mat4x4f_t*)qmalloc(sizeof(mat4x4f_t) * model.num_frames);
+		model.tags[i].matrix = (mat4x4f_t*)mem_alloc(pool, sizeof(mat4x4f_t) * model.num_frames);
 	for (i = 0; i < model.num_frames; i++)
 	{
 		for (j = 0; j < header->num_tags; j++)
@@ -159,7 +162,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 			tag_t *tag = &model.tags[j];
 
 			if (i == 0)
-				tag->name = copystring(md3_tag->name);
+				tag->name = mem_copystring(pool, md3_tag->name);
 
 			tag->matrix[i].m[0][0] = LittleFloat(md3_tag->rotationmatrix[0]);
 			tag->matrix[i].m[0][1] = LittleFloat(md3_tag->rotationmatrix[3]);
@@ -184,7 +187,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* read meshes */
 	model.num_meshes = header->num_meshes;
-	model.meshes = (mesh_t*)qmalloc(sizeof(mesh_t) * model.num_meshes);
+	model.meshes = (mesh_t*)mem_alloc(pool, sizeof(mesh_t) * model.num_meshes);
 
 	f = (unsigned char*)filedata + header->lump_meshes;
 	for (i = 0; i < header->num_meshes; i++)
@@ -208,13 +211,13 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		mesh_initialize(&model, mesh);
 
-		mesh->name = copystring(md3_mesh->name);
+		mesh->name = mem_copystring(pool, md3_mesh->name);
 
 		mesh->num_vertices = md3_mesh->num_vertices;
 		mesh->num_triangles = md3_mesh->num_triangles;
 
 	/* load triangles */
-		mesh->triangle3i = (int*)qmalloc(sizeof(int) * mesh->num_triangles * 3);
+		mesh->triangle3i = (int*)mem_alloc(pool, sizeof(int) * mesh->num_triangles * 3);
 
 		for (j = 0; j < mesh->num_triangles; j++)
 		{
@@ -225,7 +228,7 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 
 	/* load texcoords */
-		mesh->texcoord2f = (float*)qmalloc(sizeof(float) * mesh->num_vertices * 2);
+		mesh->texcoord2f = (float*)mem_alloc(pool, sizeof(float) * mesh->num_vertices * 2);
 
 		for (j = 0; j < mesh->num_vertices; j++)
 		{
@@ -235,8 +238,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 		}
 
 	/* load frames */
-		mesh->vertex3f = (float*)qmalloc(sizeof(float) * model.num_frames * mesh->num_vertices * 3);
-		mesh->normal3f = (float*)qmalloc(sizeof(float) * model.num_frames * mesh->num_vertices * 3);
+		mesh->vertex3f = (float*)mem_alloc(pool, sizeof(float) * model.num_frames * mesh->num_vertices * 3);
+		mesh->normal3f = (float*)mem_alloc(pool, sizeof(float) * model.num_frames * mesh->num_vertices * 3);
 
 		for (j = 0, md3_vertex = (md3_vertex_t*)(f + md3_mesh->lump_framevertices); j < model.num_frames * mesh->num_vertices; j++, md3_vertex++)
 		{
@@ -269,6 +272,8 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 		f += md3_mesh->lump_end;
 	}
+
+	mem_merge_pool(pool);
 
 	model.flags = header->flags;
 	model.synctype = 0;
