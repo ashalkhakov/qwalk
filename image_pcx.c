@@ -40,6 +40,9 @@ typedef struct pcx_header_s
 	char filler[58];
 } pcx_header_t;
 
+/* FIXME - the +768 on the bad filesize error should be moved till after the header is checked.
+ * otherwise very small 24-bit images will get a confusing error */
+
 static bool_t image_pcx_load_header(pcx_header_t *header, void *filedata, size_t filesize, char **out_error)
 {
 	unsigned char *f = (unsigned char*)filedata;
