@@ -174,7 +174,7 @@ static void CHECKGLERROR_(const char *file, int line)
 	if ((glerror = glGetError()))
 	{
 	/* *cough* */
-#ifdef WIN32
+#if defined(WIN32) && !defined(__MINGW32__)
 		__asm int 3;
 #else
 		printf("CHECKGLERROR failed (0x%04x) on %s ln %d\n", glerror, file, line);
