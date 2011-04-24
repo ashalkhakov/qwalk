@@ -15,7 +15,7 @@ modelconv_LDFLAGS=$(LDFLAGS)
 modelconv_DEPENDENCIES=libqwalk.a
 
 viewer_SOURCES=viewer.c v_font.c
-viewer_LDADD=libqwalk.a $(SDL_LIBS) -lGL $(LIBS)
+viewer_LDADD=libqwalk.a $(SDL_LIBS) $(GL_LIBS) $(LIBS)
 viewer_LDFLAGS=$(LDFLAGS)
 viewer_CFLAGS=$(SDL_CFLAGS)
 viewer_DEPENDENCIES=libqwalk.a

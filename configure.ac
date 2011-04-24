@@ -57,6 +57,28 @@ case "$host_os" in
 esac	
 
 AC_CHECK_LIB(dl, dlopen)
+AC_CHECK_LIB(GL, glFlush, [GL_LIBS=-lGL], [
+	AC_MSG_CHECKING([for glFlush in -lopengl32])
+	save_LIBS="$LIBS"
+	LIBS=-lopengl32
+	AC_LINK_IFELSE(
+		[
+			AC_LANG_PROGRAM([[
+				#include <windows.h>
+				#include <GL/gl.h>
+			]], [[
+				glFlush ();
+			]])
+		], [
+			GL_LIBS="$LIBS"
+			AC_MSG_RESULT([yes])
+		], [
+			AC_MSG_RESULT([no])
+		]
+	)
+	LIBS="$save_LIBS"
+])
+AC_SUBST(GL_LIBS)
 
 AM_PATH_SDL(1.2.0, HAVE_SDL=yes, HAVE_SDL=no)
 AC_SUBST(HAVE_SDL)
