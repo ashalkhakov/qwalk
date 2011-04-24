@@ -3,7 +3,7 @@ SDL_CONFIG?=sdl-config
 UNIX_LDFLAGS=-g -lm -ldl
 
 CC=gcc
-BASE_CFLAGS=-g -MD -Wall -pedantic
+BASE_CFLAGS=-g -MD -Wsign-compare -Wlogical-op -Wall -Werror -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
 
 CMD_RM=rm -f
 

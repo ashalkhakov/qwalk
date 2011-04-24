@@ -17,6 +17,7 @@
 
 #include "global.h"
 #include "image.h"
+#include "v_font.h"
 
 #include <stdarg.h>
 #include <stdio.h>

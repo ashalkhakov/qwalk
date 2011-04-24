@@ -29,7 +29,7 @@ const char *g_skinpath = NULL;
 
 static model_t *model = NULL;
 
-bool_t replacetexture(const char *filename)
+static bool_t replacetexture(const char *filename)
 {
 	char *error;
 	image_rgba_t *image;

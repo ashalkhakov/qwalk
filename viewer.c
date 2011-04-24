@@ -28,10 +28,7 @@
 #include "global.h"
 #include "model.h"
 #include "matrix.h"
-
-extern void loadfont(void);
-extern void freefont(void);
-extern void drawstringf(int x, int y, const char *s, ...);
+#include "v_font.h"
 
 int texwidth = -1; /* unused by viewer but needed by md2 exporter */
 int texheight = -1;
@@ -91,7 +88,7 @@ static r_state_t r_state;
 
 void r_init(void);
 
-void frame(void)
+static void frame(void)
 {
 	int x, y;
 
@@ -112,7 +109,7 @@ void frame(void)
 	}
 }
 
-bool_t setvideomode_sdl(int width, int height, int bpp, bool_t fullscreen)
+static bool_t setvideomode_sdl(int width, int height, int bpp, bool_t fullscreen)
 {
 	SDL_Surface *window = SDL_GetVideoSurface();
 
@@ -156,7 +153,7 @@ bool_t setvideomode_sdl(int width, int height, int bpp, bool_t fullscreen)
 	return true;
 }
 
-bool_t setvideomode(int width, int height, int bpp, bool_t fullscreen)
+static bool_t setvideomode(int width, int height, int bpp, bool_t fullscreen)
 {
 	if (!setvideomode_sdl(width, height, bpp, fullscreen))
 	{
@@ -171,7 +168,7 @@ bool_t setvideomode(int width, int height, int bpp, bool_t fullscreen)
 	return true;
 }
 
-void CHECKGLERROR_(const char *file, int line)
+static void CHECKGLERROR_(const char *file, int line)
 {
 	GLenum glerror;
 	if ((glerror = glGetError()))
@@ -250,7 +247,7 @@ static struct
 	} frames[2];
 } animblend;
 
-void calc_anim(void)
+static void calc_anim(void)
 {
 	if (g_frame != -1)
 	{
@@ -325,7 +322,7 @@ void calc_anim(void)
 	}
 }
 
-void animate_mesh(const mesh_t *mesh)
+static void animate_mesh(const mesh_t *mesh)
 {
 	if (animblend.num_frames == 1)
 	{
@@ -362,7 +359,7 @@ void animate_mesh(const mesh_t *mesh)
 	}
 }
 
-void light_mesh(const mesh_t *mesh)
+static void light_mesh(const mesh_t *mesh)
 {
 	float tlightpos[3], lightnormal[3], dot;
 	const float *v, *n;
@@ -386,7 +383,8 @@ void light_mesh(const mesh_t *mesh)
 	}
 }
 
-void calculate_planes(mesh_t *mesh)
+#if 0
+static void calculate_planes(mesh_t *mesh)
 {
 	int i;
 	int *tri;
@@ -406,8 +404,8 @@ void calculate_planes(mesh_t *mesh)
 		plane4f[3] = DotProduct(p0, plane4f);
 	}
 }
-
-void draw_tags(float alpha)
+#endif
+static void draw_tags(float alpha)
 {
 	int i;
 
@@ -453,7 +451,7 @@ void draw_tags(float alpha)
 	glColor4f(1, 1, 1, 1);
 }
 
-void calc_crap(float *xmin, float *xmax, float *ymin, float *ymax, float *znear, float *zfar)
+static void calc_crap(float *xmin, float *xmax, float *ymin, float *ymax, float *znear, float *zfar)
 {
 	float w = (float)vid_width;
 	float h = (float)vid_height;
@@ -467,7 +465,7 @@ void calc_crap(float *xmin, float *xmax, float *ymin, float *ymax, float *znear,
 	*xmin = -*xmax;
 }
 
-void gl_uploadmatrix(GLenum mode, const mat4x4f_t *m)
+static void gl_uploadmatrix(GLenum mode, const mat4x4f_t *m)
 {
 	mat4x4f_t transposed = *m;
 	mat4x4f_transpose(&transposed);
@@ -476,7 +474,7 @@ void gl_uploadmatrix(GLenum mode, const mat4x4f_t *m)
 	glLoadMatrixf((GLfloat*)transposed.m);
 }
 
-void setviewmatrix(const mat4x4f_t *m)
+static void setviewmatrix(const mat4x4f_t *m)
 {
 	mat4x4f_t t;
 
@@ -493,7 +491,7 @@ void setviewmatrix(const mat4x4f_t *m)
 	invviewmatrix = t;
 }
 
-void setmodelmatrix(const mat4x4f_t *modelmatrix)
+static void setmodelmatrix(const mat4x4f_t *modelmatrix)
 {
 	mat4x4f_t m;
 
@@ -504,7 +502,7 @@ void setmodelmatrix(const mat4x4f_t *modelmatrix)
 	mat4x4f_invert_simple(&invmodelmatrix, modelmatrix);
 }
 
-void render(void)
+static void render(void)
 {
 	int i;
 
@@ -693,7 +691,7 @@ void render(void)
 	SDL_GL_SwapBuffers();
 }
 
-bool_t replacetexture(const char *filename)
+static bool_t replacetexture(const char *filename)
 {
 	char *error;
 	image_rgba_t *image;
@@ -731,8 +729,8 @@ bool_t replacetexture(const char *filename)
 	image_free(&image);
 	return true;
 }
-
-void vandalize_skin(void)
+#if 0
+static void vandalize_skin(void)
 {
 	mesh_t *mesh;
 	int i, j, k;
@@ -762,8 +760,8 @@ void vandalize_skin(void)
 		}
 	}
 }
-
-void showfps(void)
+#endif
+static void showfps(void)
 {
 	static float lastupdate = 0;
 	static unsigned int numframes = 0;

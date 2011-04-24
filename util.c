@@ -33,6 +33,7 @@
 #endif
 
 #include "global.h"
+#include "util.h"
 
 bool_t g_force_yes = false; /* automatically choose "yes" for all confirms? */
 

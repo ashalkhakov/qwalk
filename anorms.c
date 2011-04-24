@@ -15,6 +15,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "anorms.h"
+
 /* compressed vertex normals used by mdl and md2 model formats */
 const float anorms[162][3] =
 {

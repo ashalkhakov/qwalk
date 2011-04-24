@@ -42,7 +42,7 @@ static model_format_t model_formats[] =
 static const model_format_t *get_model_format(const char *filename)
 {
 	const char *ext = strrchr(filename, '.');
-	int i;
+	size_t i;
 
 	if (ext)
 		for (i = 0; i < sizeof(model_formats) / sizeof(model_formats[0]); i++)

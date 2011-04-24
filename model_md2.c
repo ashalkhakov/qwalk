@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "anorms.h"
 #include "global.h"
 #include "model.h"
 #include "palettes.h"
@@ -27,7 +28,6 @@ extern int texwidth, texheight;
 extern const char *g_skinpath;
 
 extern const float anorms[162][3];
-int compress_normal(const float *normal);
 
 typedef struct md2_header_s
 {
