@@ -230,7 +230,7 @@ image_rgba_t *image_clone(mem_pool_t *pool, const image_rgba_t *source)
 static unsigned char palettize_colour(const palette_t *palette, bool_t fullbright, const unsigned char rgb[3])
 {
 	int i, dist;
-	int besti = -1, bestdist;
+	int besti = -1, bestdist = 0;
 
 	for (i = 0; i < 256; i++)
 	{

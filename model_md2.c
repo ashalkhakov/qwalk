@@ -614,7 +614,7 @@ static void md2_build_glcmds(const dstvert_t *texcoords, int skinwidth, int skin
 {
 	int i, j;
 	int startv;
-	int len, bestlen, besttype;
+	int len, bestlen, besttype = -1;
 	int best_xyz[1024];
 	int best_st[1024];
 	int best_tris[1024];
