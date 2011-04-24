@@ -53,9 +53,9 @@ image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata,
 	{
 	default:
 	case IMGFMT_MISSING:
-		return (out_error && (*out_error = msprintf("missing file extension"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("missing file extension"))), NULL;
 	case IMGFMT_UNRECOGNIZED:
-		return (out_error && (*out_error = msprintf("unrecognized file extension"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), NULL;
 	case IMGFMT_PCX: return image_pcx_load(pool, filedata, filesize, out_error);
 	case IMGFMT_TGA: return image_tga_load(pool, filedata, filesize, out_error);
 	case IMGFMT_JPG: return image_jpg_load(pool, filedata, filesize, out_error);
@@ -86,16 +86,16 @@ bool_t image_save(const char *filename, const image_rgba_t *image, char **out_er
 	{
 	default:
 	case IMGFMT_MISSING:
-		return (out_error && (*out_error = msprintf("missing file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("missing file extension"))), false;
 	case IMGFMT_UNRECOGNIZED:
-		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), false;
 	case IMGFMT_PCX:
-		return (out_error && (*out_error = msprintf("cannot save 32-bit image to PCX"))), false;
+		return (void)(out_error && (*out_error = msprintf("cannot save 32-bit image to PCX"))), false;
 	case IMGFMT_TGA:
 		savefunc = image_tga_save;
 		break;
 	case IMGFMT_JPG:
-		return (out_error && (*out_error = msprintf("jpeg saving not implemented"))), false; /* FIXME - so implement it! */
+		return (void)(out_error && (*out_error = msprintf("jpeg saving not implemented"))), false; /* FIXME - so implement it! */
 	}
 
 /* allocate write buffer and set it up to flush directly to the file */
@@ -123,16 +123,16 @@ bool_t image_paletted_save(const char *filename, const image_paletted_t *image, 
 	{
 	default:
 	case IMGFMT_MISSING:
-		return (out_error && (*out_error = msprintf("missing file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("missing file extension"))), false;
 	case IMGFMT_UNRECOGNIZED:
-		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), false;
 	case IMGFMT_PCX:
 		savefunc = image_pcx_save;
 		break;
 	case IMGFMT_TGA:
-		return (out_error && (*out_error = msprintf("cannot save 8-bit image to TGA"))), false;
+		return (void)(out_error && (*out_error = msprintf("cannot save 8-bit image to TGA"))), false;
 	case IMGFMT_JPG:
-		return (out_error && (*out_error = msprintf("cannot save 8-bit image to JPEG"))), false;
+		return (void)(out_error && (*out_error = msprintf("cannot save 8-bit image to JPEG"))), false;
 	}
 
 /* allocate write buffer and set it up to flush directly to the file */

@@ -109,9 +109,9 @@ bool_t model_md2_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* validate format */
 	if (memcmp(header->ident, "IDP2", 4))
-		return (out_error && (*out_error = msprintf("wrong format (not IDP2)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (not IDP2)"))), false;
 	if (LittleLong(header->version) != 8)
-		return (out_error && (*out_error = msprintf("wrong format (version not 8)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (version not 8)"))), false;
 
 	pool = mem_create_pool();
 

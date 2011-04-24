@@ -148,9 +148,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* validate format */
 	if (memcmp(header->id, "IDPO", 4) != 0)
-		return (out_error && (*out_error = msprintf("wrong format (not IDPO)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (not IDPO)"))), false;
 	if (LittleLong(header->version) != 6)
-		return (out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
 
 	pool = mem_create_pool();
 
@@ -535,13 +535,13 @@ bool_t model_mdl_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 			if (!mesh->skins[offset].components[SKIN_DIFFUSE])
 			{
 				model_free(model);
-				return (out_error && (*out_error = msprintf("Model has missing skin"))), false;
+				return (void)(out_error && (*out_error = msprintf("Model has missing skin"))), false;
 			}
 
 			if (skinwidth && skinheight && (skinwidth != mesh->skins[offset].components[SKIN_DIFFUSE]->width || skinheight != mesh->skins[offset].components[SKIN_DIFFUSE]->height))
 			{
 				model_free(model);
-				return (out_error && (*out_error = msprintf("Model has skin of different sizes. Use -texwidth and -texheight to resize all images to the same size"))), false;
+				return (void)(out_error && (*out_error = msprintf("Model has skin of different sizes. Use -texwidth and -texheight to resize all images to the same size"))), false;
 			}
 			skinwidth = mesh->skins[offset].components[SKIN_DIFFUSE]->width;
 			skinheight = mesh->skins[offset].components[SKIN_DIFFUSE]->height;
@@ -559,7 +559,7 @@ bool_t model_mdl_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 	if (!skinwidth || !skinheight)
 	{
 		model_free(model);
-		return (out_error && (*out_error = msprintf("Model has no skin. Use -tex to import a skin"))), false;
+		return (void)(out_error && (*out_error = msprintf("Model has no skin. Use -tex to import a skin"))), false;
 	}
 
 /* create 8-bit textures */

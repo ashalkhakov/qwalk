@@ -104,9 +104,9 @@ bool_t model_md3_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* validate format */
 	if (memcmp(header->ident, "IDP3", 4))
-		return (out_error && (*out_error = msprintf("wrong format (not IDP3)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (not IDP3)"))), false;
 	if (LittleLong(header->version) != 15)
-		return (out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (version not 6)"))), false;
 
 	pool = mem_create_pool();
 

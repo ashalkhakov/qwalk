@@ -48,7 +48,7 @@ static bool_t image_pcx_load_header(pcx_header_t *header, void *filedata, size_t
 	unsigned char *f = (unsigned char*)filedata;
 
 	if (filesize < 128 + /* 1 + */ 768)
-		return (out_error && (*out_error = msprintf("pcx: file is too small too be a pcx"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: file is too small too be a pcx"))), false;
 
 /* load header byte by byte because we could be loading the pcx from in the
  * middle of an unaligned stream */
@@ -70,19 +70,19 @@ static bool_t image_pcx_load_header(pcx_header_t *header, void *filedata, size_t
 	memcpy(header->filler, f + 70, 58);
 
 	if (header->manufacturer != 0x0a)
-		return (out_error && (*out_error = msprintf("pcx: bad manufacturer"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad manufacturer"))), false;
 	if (header->version != 5)
-		return (out_error && (*out_error = msprintf("pcx: bad version"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad version"))), false;
 	if (header->encoding != 1)
-		return (out_error && (*out_error = msprintf("pcx: bad encoding"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad encoding"))), false;
 	if (header->bits_per_pixel != 8)
-		return (out_error && (*out_error = msprintf("pcx: bad bits_per_pixel"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad bits_per_pixel"))), false;
 	if (header->xmax - header->xmin + 1 < 1 || header->xmax - header->xmin + 1 > 4096)
-		return (out_error && (*out_error = msprintf("pcx: bad xmax"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad xmax"))), false;
 	if (header->ymax - header->ymin + 1 < 1 || header->ymax - header->ymin + 1 > 4096)
-		return (out_error && (*out_error = msprintf("pcx: bad ymax"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad ymax"))), false;
 	if (header->color_planes != 1)
-		return (out_error && (*out_error = msprintf("pcx: bad color_planes"))), false;
+		return (void)(out_error && (*out_error = msprintf("pcx: bad color_planes"))), false;
 
 /* header.palette_type should be 1, but some pcxes use 0 or 2 for some reason, so ignore it */
 
@@ -103,7 +103,7 @@ image_paletted_t *image_pcx_load_paletted(mem_pool_t *pool, void *filedata, size
 
 	image = image_paletted_alloc(pool, header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
 	if (!image)
-		return (out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
 
 	for (y = 0; y < header.ymax - header.ymin + 1; y++)
 	{
@@ -162,7 +162,7 @@ image_rgba_t *image_pcx_load(mem_pool_t *pool, void *filedata, size_t filesize, 
 
 	image = image_alloc(pool, header.xmax - header.xmin + 1, header.ymax - header.ymin + 1);
 	if (!image)
-		return (out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("pcx: out of memory"))), NULL;
 
 	for (y = 0; y < header.ymax - header.ymin + 1; y++)
 	{

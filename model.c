@@ -226,9 +226,9 @@ bool_t model_load(const char *filename, void *filedata, size_t filesize, model_t
 	const model_format_t *format = get_model_format(filename);
 
 	if (!format)
-		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), false;
 	if (!format->load)
-		return (out_error && (*out_error = msprintf("loading not implemented for %s format", format->name))), false;
+		return (void)(out_error && (*out_error = msprintf("loading not implemented for %s format", format->name))), false;
 
 	return (*format->load)(filedata, filesize, out_model, out_error);
 }
@@ -261,9 +261,9 @@ bool_t model_save(const char *filename, const model_t *model, char **out_error)
 	xbuf_t *xbuf;
 
 	if (!format)
-		return (out_error && (*out_error = msprintf("unrecognized file extension"))), false;
+		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), false;
 	if (!format->save)
-		return (out_error && (*out_error = msprintf("saving not implemented for %s format", format->name))), false;
+		return (void)(out_error && (*out_error = msprintf("saving not implemented for %s format", format->name))), false;
 
 /* allocate write buffer, use a memory buffer because we need to be able to rewind at times (not supported with file buffers) */
 	xbuf = xbuf_create_memory(262144, out_error);

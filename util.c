@@ -201,12 +201,12 @@ FILE *openfile_write(const char *filename, char **out_error)
 	{
 		printf("File %s already exists. Overwrite? [y/N] ", filename);
 		if (!yesno())
-			return (out_error && (*out_error = msprintf("user aborted operation"))), NULL;
+			return (void)(out_error && (*out_error = msprintf("user aborted operation"))), NULL;
 	}
 
 	fp = fopen(filename, "wb");
 	if (!fp)
-		return (out_error && (*out_error = msprintf("couldn't open file: %s", strerror(errno)))), NULL;
+		return (void)(out_error && (*out_error = msprintf("couldn't open file: %s", strerror(errno)))), NULL;
 
 	return fp;
 }
@@ -288,8 +288,6 @@ bool_t writefile(const char *filename, const void *data, size_t size, char **out
 }
 
 /* memory management wrappers (leak detection) */
-
-typedef struct mem_pool_s mem_pool_t;
 
 typedef struct mem_alloc_s
 {
@@ -384,7 +382,7 @@ void mem_free_pool_(mem_pool_t *pool, bool_t complain)
 		nextalloc = alloc->next;
 
 		if (complain)
-			printf("%s (ln %d) (%d bytes)\n", alloc->file, alloc->line, alloc->numbytes);
+			printf("%s (ln %d) (%d bytes)\n", alloc->file, alloc->line, (int)alloc->numbytes);
 		free(alloc);
 	}
 
@@ -716,7 +714,7 @@ xbuf_t *xbuf_create_memory(size_t block_size, char **out_error)
 
 	xbuf = (xbuf_t*)qmalloc(sizeof(xbuf_t));
 	if (!xbuf)
-		return (out_error && (*out_error = msprintf("out of memory"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("out of memory"))), NULL;
 
 	xbuf->block_size = block_size;
 	xbuf->block_head = NULL;
@@ -728,7 +726,7 @@ xbuf_t *xbuf_create_memory(size_t block_size, char **out_error)
 	if (!xbuf_new_block(xbuf)) /* create the first block */
 	{
 		qfree(xbuf);
-		return (out_error && (*out_error = msprintf("out of memory"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("out of memory"))), NULL;
 	}
 
 	return xbuf;
@@ -739,7 +737,7 @@ xbuf_t *xbuf_create_file(size_t block_size, const char *filename, char **out_err
 	xbuf_t *xbuf;
 
 	if (!filename)
-		return (out_error && (*out_error = msprintf("no filename specified"))), NULL;
+		return (void)(out_error && (*out_error = msprintf("no filename specified"))), NULL;
 
 	xbuf = xbuf_create_memory(block_size, out_error);
 	if (!xbuf)
@@ -879,9 +877,9 @@ bool_t xbuf_write_to_file(xbuf_t *xbuf, const char *filename, char **out_error)
 	xbuf_block_t *block;
 
 	if (xbuf->error)
-		return (out_error && (*out_error = msprintf("cannot write buffer to file: a previous error occurred"))), false;
+		return (void)(out_error && (*out_error = msprintf("cannot write buffer to file: a previous error occurred"))), false;
 	if (xbuf->fp)
-		return (out_error && (*out_error = msprintf("xbuf_write_to_file called on a file buffer"))), false;
+		return (void)(out_error && (*out_error = msprintf("xbuf_write_to_file called on a file buffer"))), false;
 
 	fp = openfile_write(filename, out_error);
 	if (!fp)
@@ -916,7 +914,7 @@ bool_t xbuf_finish_memory(xbuf_t *xbuf, void **out_data, size_t *out_length, cha
 	if (!data)
 	{
 		xbuf_free(xbuf, NULL);
-		return (out_error && (*out_error = msprintf("out of memory"))), false;
+		return (void)(out_error && (*out_error = msprintf("out of memory"))), false;
 	}
 
 	p = (unsigned char*)data;

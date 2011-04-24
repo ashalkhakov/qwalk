@@ -249,7 +249,7 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, mem_poo
 			else
 			{
 				if (image->width != header->bitmap_width || image->height != header->bitmap_height)
-					return (out_error && (*out_error = msprintf("failed to load skin: wrong size"))), false;
+					return (void)(out_error && (*out_error = msprintf("failed to load skin: wrong size"))), false;
 
 				skininfo->skins[j].name = NULL; /* loaded later */
 				skininfo->skins[j].offset = offset;
@@ -331,7 +331,7 @@ static bool_t mdo_load_skins(const mdo_header_t *header, model_t *model, mem_poo
 	num_strings = mdo_read_int(&f);
 
 	if (num_strings < model->total_skins)
-		return (out_error && (*out_error = msprintf("number of skin names is less than total number of skins"))), false;
+		return (void)(out_error && (*out_error = msprintf("number of skin names is less than total number of skins"))), false;
 
 	for (i = 0, skininfo = model->skininfo; i < header->bitmap_count; i++, skininfo++)
 	{
@@ -508,7 +508,7 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 		*out_error = NULL;
 
 	if (filesize < sizeof(mdo_header_t))
-		return (out_error && (*out_error = msprintf("wrong format"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format"))), false;
 
 	memcpy(header.ident, f, 4); f += 4;
 	header.version            = mdo_read_int(&f);
@@ -528,9 +528,9 @@ bool_t model_mdo_load(void *filedata, size_t filesize, model_t *out_model, char 
 
 /* validate header */
 	if (memcmp(header.ident, "MDO_", 4) != 0)
-		return (out_error && (*out_error = msprintf("wrong format (not MDO_)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (not MDO_)"))), false;
 	if (LittleLong(header.version) != 1)
-		return (out_error && (*out_error = msprintf("wrong format (version not 1)"))), false;
+		return (void)(out_error && (*out_error = msprintf("wrong format (version not 1)"))), false;
 
 /* allocate memory pool so we don't have to clean things up by hand if we have
  * to return an error somewhere in the middle of this function... */
