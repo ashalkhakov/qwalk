@@ -29,13 +29,13 @@ image_rgba_t *image_tga_load(mem_pool_t *pool, void *filedata, size_t filesize, 
 	unsigned char *f = (unsigned char*)filedata;
 	unsigned char *endf = f + filesize;
 	int id_length;
-	int colormap_type;
+	//FIXME int colormap_type;
 	int image_type;
 	int colormap_index;
 	int colormap_length;
 	int colormap_size;
-	int x_origin;
-	int y_origin;
+	//FIXME int x_origin;
+	//FIXME int y_origin;
 	int width;
 	int height;
 	int pixel_size;
@@ -51,13 +51,13 @@ image_rgba_t *image_tga_load(mem_pool_t *pool, void *filedata, size_t filesize, 
 
 /* load header manually because not all of these values are aligned */
 	id_length       = f[0];
-	colormap_type   = f[1];
+	//FIXME colormap_type   = f[1];
 	image_type      = f[2];
 	colormap_index  = f[3] + f[4] * 256;
 	colormap_length = f[5] + f[6] * 256;
 	colormap_size   = f[7];
-	x_origin        = f[8] + f[9] * 256;
-	y_origin        = f[10] + f[11] * 256;
+	//FIXME x_origin        = f[8] + f[9] * 256;
+	//FIXME y_origin        = f[10] + f[11] * 256;
 	width           = f[12] + f[13] * 256;
 	height          = f[14] + f[15] * 256;
 	pixel_size      = f[16];
