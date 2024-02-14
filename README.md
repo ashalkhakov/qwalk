@@ -32,6 +32,13 @@ specify an image to load as a texture. The PCX, TGA, and JPEG formats are suppor
 texture file aren't currently supported.
 Tags are rendered in the model viewer as tri-colour axes, but they aren't useful for anything yet.
 
+## DKM (Daikatana)
+
+DKMs can be imported and exported with full functionality.
+When a DKM is imported, the program will look for the external skin files referenced by the model. So, make sure you are in the
+right directory (e.g. "baseq2") when you run the program, because most skins have a path like "models/monsters/soldier/skin.pcx".
+Alternatively, you can manually specify a texture using the "-tex" command-line parameter.
+
 # Guide
 
 ## Model converter

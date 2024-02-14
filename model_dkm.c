@@ -492,8 +492,8 @@ bool_t model_dkm_load(void *filedata, size_t filesize, model_t *out_model, char 
     }
     mem_free(images);
 
-	mem_merge_pool(pool);
+    mem_merge_pool(pool);
 
-	*out_model = model;
-	return true;
+    *out_model = model;
+    return true;
 }
