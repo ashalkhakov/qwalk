@@ -26,6 +26,7 @@ int texwidth = -1;
 int texheight = -1;
 
 const char *g_skinpath = NULL;
+const char * g_skin_base_name = NULL;
 
 static model_t *model = NULL;
 
@@ -216,10 +217,11 @@ int main(int argc, char **argv)
 "                     is required for any texture to be loaded onto MD2 or MD3\n"
 "                     models (the program doesn't automatically load external\n"
 "                     skins). Supported formats are PCX, TGA, and JPEG.\n"
+"  -outtex filename   set custom path for output skin for MD3 save (without extension).\n"
 "  -texwidth #        see below\n"
 "  -texheight #       resample the model's texture to the given dimensions.\n"
 "  -skinpath x        specify the path that skins will be exported to when\n"
-"                     exporting to md2 (e.g. \"models/players\"). Should not\n"
+"                     exporting to md2 or md3 (e.g. \"models/players\"). Should not\n"
 "                     contain trailing slash. If skinpath is not specified,\n"
 "                     skins will be created in the same folder as the model.\n"
 "  -flags #           set model flags, such as rocket smoke trail, rotate, etc.\n"
@@ -234,6 +236,9 @@ int main(int argc, char **argv)
 "  -renormal          recalculate vertex normals.\n"
 "  -rename_frames     rename all frames to \"frame1\", \"frame2\", etc.\n"
 "  -force             force \"yes\" response to all confirmation requests\n"
+"                     regarding overwriting existing files or creating\n"
+"                     nonexistent paths.\n"
+"  -noforce           force \"no\" (default) response to all confirmation requests\n"
 "                     regarding overwriting existing files or creating\n"
 "                     nonexistent paths.\n"
 		);
@@ -267,6 +272,16 @@ int main(int argc, char **argv)
 				}
 
 				strlcpy(texfilename, argv[i], sizeof(texfilename));
+			}
+			else if (!strcmp(argv[i], "-outtex"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-outtex'\n", argv[0]);
+					return 0;
+				}
+
+				g_skin_base_name = argv[i];
 			}
 			else if (!strcmp(argv[i], "-texwidth"))
 			{
@@ -399,6 +414,10 @@ int main(int argc, char **argv)
 			else if (!strcmp(argv[i], "-force"))
 			{
 				g_force_yes = true;
+			}
+			else if (!strcmp(argv[i], "-noforce"))
+			{
+				g_force_no = true;
 			}
 			else
 			{

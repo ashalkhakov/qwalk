@@ -27,7 +27,8 @@ typedef enum image_format_e
 	IMGFMT_UNRECOGNIZED,
 	IMGFMT_PCX,
 	IMGFMT_TGA,
-	IMGFMT_JPG
+	IMGFMT_JPG,
+	IMGFMT_BMP
 } image_format_t;
 
 static image_format_t get_image_format(const char *filename)
@@ -43,6 +44,8 @@ static image_format_t get_image_format(const char *filename)
 		return IMGFMT_TGA;
 	if (!strcasecmp(ext, ".jpg") || !strcasecmp(ext, ".jpeg"))
 		return IMGFMT_JPG;
+	if (!strcasecmp(ext, ".bmp"))
+		return IMGFMT_BMP;
 
 	return IMGFMT_UNRECOGNIZED;
 }
@@ -59,6 +62,7 @@ image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata,
 	case IMGFMT_PCX: return image_pcx_load(pool, filedata, filesize, out_error);
 	case IMGFMT_TGA: return image_tga_load(pool, filedata, filesize, out_error);
 	case IMGFMT_JPG: return image_jpg_load(pool, filedata, filesize, out_error);
+	case IMGFMT_BMP: return image_bmp_load(pool, filedata, filesize, out_error);
 	}
 }
 
@@ -96,6 +100,8 @@ bool_t image_save(const char *filename, const image_rgba_t *image, char **out_er
 		break;
 	case IMGFMT_JPG:
 		return (void)(out_error && (*out_error = msprintf("jpeg saving not implemented"))), false; /* FIXME - so implement it! */
+	case IMGFMT_BMP:
+		return (void)(out_error && (*out_error = msprintf("bmp saving not implemented"))), false; /* FIXME - so implement it! */
 	}
 
 /* allocate write buffer and set it up to flush directly to the file */

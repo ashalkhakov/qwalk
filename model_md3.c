@@ -22,6 +22,9 @@
 #include "global.h"
 #include "model.h"
 
+extern const char *g_skinpath;
+extern const char *g_skin_base_name;
+
 typedef struct md3_vertex_s
 {
 	short origin[3];
@@ -312,40 +315,87 @@ static unsigned short md3_encodenormal(const float n[3])
 	return ((blat & 0xff) << 8) | (blng & 0xff);
 }
 
+static char *md3_create_skin_filename(const char *skinname)
+{
+	char temp[1024];
+	char *c;
+
+/* in case skinname is already a file path, strip path and extension (so "models/something/skin.pcx" becomes "skin") */
+	if ((c = strrchr(skinname, '/')))
+		strcpy(temp, c + 1);
+	else
+		strcpy(temp, skinname);
+
+	if ((c = strchr(temp, '.')))
+		*c = '\0';
+
+	if (g_skinpath && g_skinpath[0])
+		return msprintf("%s/%s.tga", g_skinpath, temp);
+	else
+		return msprintf("%s.tga", temp);
+}
+
 bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 {
 	md3_header_t header;
 	const frameinfo_t *frameinfo;
+	char **skinshaders;
 	const tag_t *tag;
 	const mesh_t *mesh;
-	int i, j, k, m;
+	int i, j, k, m, n;
 
 	memcpy(header.ident, "IDP3", 4);
 	header.version    = LittleLong(15);
 	strlcpy(header.name, "md3model", sizeof(header.name));
 	header.flags      = LittleLong(model->flags);
-	header.num_frames = LittleLong(model->num_frames);
+	header.num_frames = LittleLong(model->total_frames); // Export all frames (include all frames inside frame groups).
 	header.num_tags   = LittleLong(model->num_tags);
 	header.num_meshes = LittleLong(model->num_meshes);
 	header.num_skins  = LittleLong(model->num_skins);
+
+/* create 32-bit skins and save them to TGA files */
+	skinshaders = (char**)qmalloc(sizeof(char*) * model->num_skins);
+	for (i = 0; i < model->num_skins; i++)
+	{
+		char skin_image[1024];
+
+		if (g_skin_base_name && g_skin_base_name[0])
+		{
+			skinshaders[i] = model->num_skins == 1 ? msprintf("%s", g_skin_base_name) : msprintf("%s%d", g_skin_base_name, i);
+			snprintf(skin_image, sizeof(skin_image), "%s.tga", skinshaders[i]);
+		}
+		else
+		{
+			skinshaders[i] = msprintf("%s", model->skininfo[i].skins[0].name);
+			snprintf(skin_image, sizeof(skin_image), "%s", skinshaders[i]);
+		}
+
+		image_save(skin_image, model->meshes[0].skins[i].components[SKIN_DIFFUSE], out_error);
+
+		if (model->meshes[0].skins[i].components[SKIN_FULLBRIGHT] && model->meshes[0].skins[i].components[SKIN_FULLBRIGHT]->num_nonempty_pixels > 0)
+		{
+			snprintf(skin_image, sizeof(skin_image), "%s_fb.tga", skinshaders[i]);
+			image_save(skin_image, model->meshes[0].skins[i].components[SKIN_FULLBRIGHT], out_error);
+		}
+	}
 
 /* calculate lump offsets */
 	i = sizeof(md3_header_t);
 
 	header.lump_frameinfo = LittleLong(i);
-	i += sizeof(md3_frameinfo_t) * model->num_frames;
+	i += sizeof(md3_frameinfo_t) * model->total_frames;
 
 	header.lump_tags = LittleLong(i);
-	i += sizeof(md3_tag_t) * model->num_frames * model->num_tags;
+	i += sizeof(md3_tag_t) * model->total_frames * model->num_tags;
 
 	header.lump_meshes = i;
 	for (j = 0, mesh = model->meshes; j < model->num_meshes; j++, mesh++)
 	{
 		i += sizeof(md3_mesh_t); /* mesh header */
 		i += mesh->num_triangles * sizeof(int[3]); /* triangle elements */
-		/* FIXME - shaders? */
+		i += model->num_skins * sizeof(md3_shader_t);
 		i += mesh->num_vertices * sizeof(float[2]); /* texcoords */
-		i += mesh->num_vertices * model->num_frames * sizeof(md3_vertex_t); /* framevertices */
+		i += mesh->num_vertices * model->total_frames * sizeof(md3_vertex_t); /* framevertices */
 	}
 
 	header.lump_end = i;
@@ -355,8 +405,9 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 
 /* write frameinfo */
 	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
+	for( n = 0; n < frameinfo->num_frames; n++ )
 	{
-		const singleframe_t *singleframe = &frameinfo->frames[0];
+		const singleframe_t *singleframe = &frameinfo->frames[n];
 		md3_frameinfo_t md3_frameinfo;
 		float mins[3], maxs[3], dist[3];
 		bool_t first = true;
@@ -392,7 +443,7 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 	}
 
 /* write tags */
-	for (i = 0, frameinfo = model->frameinfo; i < model->num_frames; i++, frameinfo++)
+	for (i = 0, frameinfo = model->frameinfo; i < model->total_frames; i++, frameinfo++)
 	{
 		for (j = 0, tag = model->tags; j < model->num_tags; j++, tag++)
 		{
@@ -427,8 +478,8 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		strlcpy(md3_mesh.name, mesh->name, sizeof(md3_mesh.name));
 		md3_mesh.flags = 0; /* unused */
 
-		md3_mesh.num_frames = LittleLong(model->num_frames);
-		md3_mesh.num_shaders = 0; // FIXME - TODO
+		md3_mesh.num_frames = LittleLong(model->total_frames);
+		md3_mesh.num_shaders = model->total_skins;
 		md3_mesh.num_vertices = LittleLong(mesh->num_vertices);
 		md3_mesh.num_triangles = LittleLong(mesh->num_triangles);
 
@@ -438,13 +489,13 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		j += mesh->num_triangles * sizeof(int[3]);
 
 		md3_mesh.lump_shaders = j;
-		j += 0; // FIXME - TODO
+		j += sizeof(md3_shader_t) * model->num_skins;
 
 		md3_mesh.lump_texcoords = j;
 		j += mesh->num_vertices * sizeof(float[2]);
 
 		md3_mesh.lump_framevertices = j;
-		j += mesh->num_vertices * model->num_frames * sizeof(md3_vertex_t);
+		j += mesh->num_vertices * model->total_frames * sizeof(md3_vertex_t);
 
 		md3_mesh.lump_end = j;
 
@@ -463,7 +514,12 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		}
 
 	/* write shaders */
-		// FIXME - TODO
+		for (j = 0; j < model->total_skins; j++)
+		{
+			md3_shader_t md3_shader;
+			strcpy(md3_shader.name, skinshaders[j]);
+			xbuf_write_data(xbuf, sizeof(md3_shader), &md3_shader);
+		}
 
 	/* write texcoords */
 		for (j = 0; j < mesh->num_vertices; j++)
@@ -478,8 +534,9 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 
 	/* write framevertices */
 		for (j = 0, frameinfo = model->frameinfo; j < model->num_frames; j++, frameinfo++)
+		for( n = 0; n < frameinfo->num_frames; n++ )
 		{
-			const singleframe_t *singleframe = &frameinfo->frames[0];
+			const singleframe_t *singleframe = &frameinfo->frames[n];
 			const float *v = mesh->vertex3f + singleframe->offset * mesh->num_vertices * 3;
 			const float *n = mesh->normal3f + singleframe->offset * mesh->num_vertices * 3;
 

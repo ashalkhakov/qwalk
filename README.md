@@ -124,3 +124,12 @@ Some more far-fetched major features for later versions:
 * Convert MAP files (e.g. the health/ammo pickups) to models.
 * Read files out of PAK or PK3/ZIP files.
 * Generate sample QuakeC code for monsters, containing animation information and stub AI code.
+
+# Building
+
+The old autoconf/automake build is possibly broken. Please use the CMake-based build instead:
+
+```
+cmake -S . -B build
+cmake --build build
+```

@@ -27,3 +27,5 @@ stamp-h1
 /modelconv
 /viewer
 
+build/
+

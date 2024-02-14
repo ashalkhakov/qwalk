@@ -36,6 +36,7 @@
 #include "util.h"
 
 bool_t g_force_yes = false; /* automatically choose "yes" for all confirms? */
+bool_t g_force_no = true; /* automatically choose "no" for all confirms? */
 
 unsigned short SwapShort(unsigned short v)
 {
@@ -95,6 +96,11 @@ bool_t yesno(void)
 	{
 		printf("y\n");
 		return true;
+	}
+	if (g_force_no)
+	{
+		printf("N\n");
+		return false;
 	}
 
 	fgets(buffer, sizeof(buffer), stdin);

@@ -467,6 +467,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 		mesh->skins[i].components[SKIN_DIFFUSE]    = image_alloc(pool, header->skinwidth, header->skinheight);
 		mesh->skins[i].components[SKIN_FULLBRIGHT] = image_alloc(pool, header->skinwidth, header->skinheight);
 
+		mesh->skins[i].components[SKIN_DIFFUSE]->num_nonempty_pixels = 0;
+		mesh->skins[i].components[SKIN_FULLBRIGHT]->num_nonempty_pixels = 0;
+
 		for (j = 0; j < header->skinwidth * header->skinheight; j++)
 		{
 			unsigned char c = skintexstart[i][j];
@@ -483,6 +486,8 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = palette_quake.rgb[c*3+1];
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = palette_quake.rgb[c*3+2];
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+
+				++mesh->skins[i].components[SKIN_FULLBRIGHT]->num_nonempty_pixels;
 			}
 			else
 			{
@@ -495,7 +500,9 @@ bool_t model_mdl_load(void *filedata, size_t filesize, model_t *out_model, char 
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+0] = 0;
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+1] = 0;
 				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+2] = 0;
-				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 255;
+				mesh->skins[i].components[SKIN_FULLBRIGHT]->pixels[j*4+3] = 0;
+
+				++mesh->skins[i].components[SKIN_DIFFUSE]->num_nonempty_pixels;
 			}
 		}
 	}

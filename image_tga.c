@@ -165,6 +165,7 @@ image_rgba_t *image_tga_load(mem_pool_t *pool, void *filedata, size_t filesize, 
 			row_inc = 0;
 		}
 
+		x = 0;
 		if (compressed)
 		{
 			while (y < height)

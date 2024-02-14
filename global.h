@@ -75,6 +75,7 @@ void *qmalloc_(size_t numbytes, const char *file, int line);
 void qfree(void *mem);
 
 char *mem_copystring(mem_pool_t *pool, const char *string);
+#define copystring QWALK_copystring
 char *copystring(const char *string);
 char *mem_sprintf(mem_pool_t *pool, const char *format, ...);
 char *msprintf(const char *format, ...);
@@ -86,6 +87,7 @@ void strlcpy(char *dest, const char *src, size_t size);
 #endif
 
 extern bool_t g_force_yes;
+extern bool_t g_force_no;
 
 bool_t makepath(char *path, char **out_error);
 bool_t loadfile(const char *filename, void **out_data, size_t *out_size, char **out_error);
