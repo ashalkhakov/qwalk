@@ -113,7 +113,7 @@ Options:
 
 # Todo
 
-For a full todo list, see the [TODO file on the git repository](qwalk/TODO).
+For a full todo list, see the [TODO file on the git repository](TODO).
 
 Some more far-fetched major features for later versions:
 
