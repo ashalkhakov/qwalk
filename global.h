@@ -1,4 +1,4 @@
-/*
+    /*
     QShed <http://www.icculus.org/qshed>
 
     This program is free software: you can redistribute it and/or modify
@@ -79,7 +79,9 @@ char *mem_copystring(mem_pool_t *pool, const char *string);
 char *copystring(const char *string);
 char *mem_sprintf(mem_pool_t *pool, const char *format, ...);
 char *msprintf(const char *format, ...);
+#ifdef WIN32
 void strlcpy(char *dest, const char *src, size_t size);
+#endif
 
 #ifdef WIN32
 # define strcasecmp _stricmp

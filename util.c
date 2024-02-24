@@ -73,6 +73,7 @@ float SwapFloat(float v)
 	return dat2.f;
 }
 
+#ifdef WIN32
 void strlcpy(char *dest, const char *src, size_t size)
 {
 	size_t i;
@@ -87,6 +88,7 @@ void strlcpy(char *dest, const char *src, size_t size)
 			break;
 	}
 }
+#endif
 
 bool_t yesno(void)
 {
