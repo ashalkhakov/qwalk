@@ -1070,7 +1070,6 @@ void free_list_files(char **list, int num_files)
 	{
 		return;
 	}
-	printf("freeing up stuff\n");
 
 	for (i = 0; i < num_files; i++) {
 		qfree(list[i]);
