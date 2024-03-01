@@ -346,7 +346,7 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 
 	memcpy(header.ident, "IDP3", 4);
 	header.version    = LittleLong(15);
-	strlcpy(header.name, "md3model", sizeof(header.name));
+	Q_strlcpy(header.name, "md3model", sizeof(header.name));
 	header.flags      = LittleLong(model->flags);
 	header.num_frames = LittleLong(model->total_frames); // Export all frames (include all frames inside frame groups).
 	header.num_tags   = LittleLong(model->num_tags);
@@ -437,7 +437,7 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		VectorCopy(md3_frameinfo.maxs, maxs);
 		VectorClear(md3_frameinfo.origin);
 		md3_frameinfo.radius = (float)sqrt(DotProduct(dist, dist));
-		strlcpy(md3_frameinfo.name, singleframe->name, sizeof(md3_frameinfo.name));
+		Q_strlcpy(md3_frameinfo.name, singleframe->name, sizeof(md3_frameinfo.name));
 
 		xbuf_write_data(xbuf, sizeof(md3_frameinfo_t), &md3_frameinfo);
 	}
@@ -450,7 +450,7 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 			int ofs = frameinfo->frames[0].offset;
 			md3_tag_t md3_tag;
 
-			strlcpy(md3_tag.name, tag->name, sizeof(md3_tag.name));
+			Q_strlcpy(md3_tag.name, tag->name, sizeof(md3_tag.name));
 
 			md3_tag.rotationmatrix[0] = LittleFloat(tag->matrix[ofs].m[0][0]);
 			md3_tag.rotationmatrix[3] = LittleFloat(tag->matrix[ofs].m[0][1]);
@@ -475,7 +475,7 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		md3_mesh_t md3_mesh;
 
 		memcpy(md3_mesh.ident, "IDP3", 4);
-		strlcpy(md3_mesh.name, mesh->name, sizeof(md3_mesh.name));
+		Q_strlcpy(md3_mesh.name, mesh->name, sizeof(md3_mesh.name));
 		md3_mesh.flags = 0; /* unused */
 
 		md3_mesh.num_frames = LittleLong(model->total_frames);

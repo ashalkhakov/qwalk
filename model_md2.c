@@ -801,7 +801,7 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 	{
 		md2_skin_t md2skin;
 		
-		strlcpy(md2skin.name, skinfilenames[i], sizeof(md2skin.name));
+		Q_strlcpy(md2skin.name, skinfilenames[i], sizeof(md2skin.name));
 
 		xbuf_write_data(xbuf, sizeof(md2_skin_t), &md2skin);
 	}
@@ -845,7 +845,7 @@ bool_t model_md2_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 			md2frame.translate[j] = LittleFloat(md2data->frames[i].translate[j]);
 		}
 
-		strlcpy(md2frame.name, model->frameinfo[i].frames[0].name, sizeof(md2frame.name));
+		Q_strlcpy(md2frame.name, model->frameinfo[i].frames[0].name, sizeof(md2frame.name));
 
 		xbuf_write_data(xbuf, sizeof(daliasframe_t), &md2frame);
 

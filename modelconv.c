@@ -260,7 +260,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strlcpy(infilename, argv[i], sizeof(infilename));
+				Q_strlcpy(infilename, argv[i], sizeof(infilename));
 			}
 			else if (!strcmp(argv[i], "-s"))
 			{
@@ -270,7 +270,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strlcpy(shaderbasepath, argv[i], sizeof(shaderbasepath));
+				Q_strlcpy(shaderbasepath, argv[i], sizeof(shaderbasepath));
 			}
 			else if (!strcmp(argv[i], "-notex"))
 			{
@@ -284,7 +284,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strlcpy(texfilename, argv[i], sizeof(texfilename));
+				Q_strlcpy(texfilename, argv[i], sizeof(texfilename));
 			}
 			else if (!strcmp(argv[i], "-outtex"))
 			{
@@ -336,7 +336,7 @@ int main(int argc, char **argv)
 					return 0;
 				}
 
-				strlcpy(skinpath, argv[i], sizeof(skinpath));
+				Q_strlcpy(skinpath, argv[i], sizeof(skinpath));
 
 			/* parse the path, create missing directories, and normalize the path syntax to something like "folder/folder/folder" */
 				if (!makepath(skinpath, &error))
@@ -440,7 +440,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			strlcpy(outfilename, argv[i], sizeof(outfilename));
+			Q_strlcpy(outfilename, argv[i], sizeof(outfilename));
 		}
 	}
 

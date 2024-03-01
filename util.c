@@ -77,8 +77,7 @@ float SwapFloat(float v)
 	return dat2.f;
 }
 
-#ifdef WIN32
-void strlcpy(char *dest, const char *src, size_t size)
+void Q_strlcpy(char *dest, const char *src, size_t size)
 {
 	size_t i;
 
@@ -92,7 +91,6 @@ void strlcpy(char *dest, const char *src, size_t size)
 			break;
 	}
 }
-#endif
 
 bool_t yesno(void)
 {
@@ -986,13 +984,14 @@ char **list_files(const char *directory, const char *extension, int *num_files) 
 	DIR           *fdir;
 	char          *search;
 	int           nfiles;
-	char          **listCopy;
-	char          *list[MAX_FOUND_FILES];
+	static char   *list[MAX_FOUND_FILES];
 	int           i;
 	struct stat   st;
 	int			  dironly = 0;
 
 	int           extLen;
+
+	memset(list, 0, sizeof(list));
 
 	if (!directory || directory[0] == '\0')
 	{
@@ -1054,20 +1053,13 @@ char **list_files(const char *directory, const char *extension, int *num_files) 
 
 	closedir(fdir);
 
-	// return a copy of the list
 	*num_files = nfiles;
 
 	if ( !nfiles ) {
 		return NULL;
 	}
 
-	listCopy = qmalloc((nfiles + 1) * sizeof(*listCopy));
-	for ( i = 0 ; i < nfiles ; i++ ) {
-		listCopy[i] = list[i];
-	}
-	listCopy[i] = NULL;
-
-	return listCopy;
+	return list;
 }
 
 void free_list_files(char **list, int num_files)
@@ -1078,10 +1070,10 @@ void free_list_files(char **list, int num_files)
 	{
 		return;
 	}
+	printf("freeing up stuff\n");
 
 	for (i = 0; i < num_files; i++) {
 		qfree(list[i]);
 		list[i] = 0;
 	}
-	qfree(list);
 }

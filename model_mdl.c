@@ -778,7 +778,7 @@ bool_t model_mdl_save(const model_t *orig_model, xbuf_t *xbuf, char **out_error)
 			simpleframe->bboxmax.v[1] = 0;
 			simpleframe->bboxmax.v[2] = 0;
 			simpleframe->bboxmax.lightnormalindex = 0;
-			strlcpy(simpleframe->name, frameinfo->frames[j].name, sizeof(simpleframe->name));
+			Q_strlcpy(simpleframe->name, frameinfo->frames[j].name, sizeof(simpleframe->name));
 
 			v = mesh->vertex3f + offset * mesh->num_vertices * 3;
 			n = mesh->normal3f + offset * mesh->num_vertices * 3;

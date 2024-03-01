@@ -274,12 +274,11 @@ typedef struct shader_s
 #define	MAX_SHADER_FILES	4096
 #define FILE_HASH_SIZE		1024
 
-static	shader_t	        *hash_table[FILE_HASH_SIZE];
 static  shader_source_t     *source_hash_table[FILE_HASH_SIZE];
+static shader_source_t      shader_sources[MAX_SHADER_FILES];
+static int                  num_shader_sources;
 
-int                         num_shader_sources;
-shader_source_t             shader_sources[MAX_SHADER_FILES];
-
+static shader_t	        	*hash_table[FILE_HASH_SIZE];
 static shader_t             shaders[MAX_SHADERS];
 static int                  num_shaders;
 
@@ -311,7 +310,7 @@ static long generateHashValue( const char *fname, const int size ) {
 static shader_source_t *FindShaderSourceByName(const char *name)
 {
 	int			    hash;
-	shader_source_t	*sh;
+	shader_source_t	*source;
 
     if (!name || !name[0])
         return NULL;
@@ -321,14 +320,10 @@ static shader_source_t *FindShaderSourceByName(const char *name)
 	//
 	// see if the shader source is already loaded
 	//
-	for (sh=source_hash_table[hash]; sh; sh=sh->next) {
-		// NOTE: if there was no shader or image available with the name strippedName
-		// then a default shader is created with lightmapIndex == LIGHTMAP_NONE, so we
-		// have to check all default shaders otherwise for every call to R_FindShader
-		// with that same strippedName a new default shader is created.
-		if (strcasecmp(sh->filename, name) == 0) {
+	for (source=source_hash_table[hash]; source; source=source->next) {
+		if (strcasecmp(source->filename, name) == 0) {
 			// match found
-			return sh;
+			return source;
 		}
 	}
 
@@ -336,13 +331,13 @@ static shader_source_t *FindShaderSourceByName(const char *name)
     {
         return NULL;
     }
-	sh = &shader_sources[num_shader_sources++];
-    strlcpy(sh->filename, name, sizeof(sh->filename));
-    sh->shaders = NULL;
-    sh->new_shaders = NULL;
-	hash = generateHashValue(sh->filename, FILE_HASH_SIZE);
-	sh->next = source_hash_table[hash];
-	source_hash_table[hash] = sh;
+	source = &shader_sources[num_shader_sources++];
+    Q_strlcpy(source->filename, name, sizeof(source->filename));
+    source->shaders = NULL;
+    source->new_shaders = NULL;
+	hash = generateHashValue(source->filename, FILE_HASH_SIZE);
+	source->next = source_hash_table[hash];
+	source_hash_table[hash] = source;
 }
 
 static shader_t *FindShaderByName(const char *name)
@@ -379,10 +374,11 @@ static shader_t *FindShaderByName(const char *name)
         return NULL;
     }
 	sh = &shaders[num_shaders++];
-    strlcpy(sh->name, strippedName, sizeof(sh->name));
+    Q_strlcpy(sh->name, strippedName, sizeof(sh->name));
 	hash = generateHashValue(sh->name, FILE_HASH_SIZE);
 	sh->next = hash_table[hash];
 	hash_table[hash] = sh;
+	sh->next_in_file = NULL;
     sh->file = NULL;
 
 	return sh;
@@ -400,7 +396,7 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
 {
     char shader_dir[1024];
 	char **shaderFiles;
-	char *buffers[MAX_SHADER_FILES];
+	char *buffer;
 	char *p;
 	int numShaderFiles;
 	int i;
@@ -438,13 +434,12 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
         }
         shader_source->sourced = true;
 
-        if (!loadfile(filename, (void **)&buffers[i], &size, out_error))
+        if (!loadfile(filename, (void **)&buffer, &size, out_error))
         {
-            free_list_files(shaderFiles, numShaderFiles);
-            return (void)(out_error && (*out_error = msprintf("couldn't load %s: %s", filename, out_error))), false;
+            break;
         }
 
-		p = buffers[i];
+		p = buffer;
 		COM_BeginParseSession(filename);
 		while (1)
 		{
@@ -453,7 +448,7 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
 			if(!*token)
 				break;
 
-			strlcpy(shaderName, token, sizeof(shaderName));
+			Q_strlcpy(shaderName, token, sizeof(shaderName));
 			shaderLine = COM_GetCurrentParseLine();
 
 			token = COM_ParseExt(&p, true);
@@ -466,8 +461,6 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
 					printf(" (found \"%s\" on line %d)", token, COM_GetCurrentParseLine());
 				}
 				printf(".\n");
-				qfree(buffers[i]);
-				buffers[i] = NULL;
 				break;
 			}
 
@@ -475,22 +468,21 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
 			{
 				printf("WARNING: Ignoring shader file %s. Shader \"%s\" on line %d missing closing brace.\n",
 							filename, shaderName, shaderLine);
-				qfree(buffers[i]);
-				buffers[i] = NULL;
 				break;
 			}
 
             shader = FindShaderByName(shaderName);
             if (shader == NULL)
             {
+				printf("not enough space\n");
                 break; // not enough space
             }
 
             if (shader->file != NULL)
             {
                 // it's a duplicate sourced shader...
-                printf("Shader \"%s\" on line %d of file %s previously defined in file %s.\n",
-                    filename, shaderName, shaderLine, shader->file->filename);
+                //printf("Shader \"%s\" on line %d of file %s previously defined in file %s.\n",
+                //    shaderName, shaderLine, shader->file->filename);
             }
             else
             {
@@ -499,6 +491,12 @@ static bool_t ScanAndLoadShaderFiles(char **out_error)
                 shader->next_in_file = shader_source->shaders;
                 shader_source->shaders = shader;
             }
+		}
+
+		if (buffer)
+		{
+			qfree(buffer);
+			buffer = NULL;
 		}
 	}
 
@@ -515,7 +513,7 @@ bool_t init_shaders(const char *basepath, char **out_error)
     if (initialized || !basepath || !*basepath)
         return true;
 
-    strlcpy(shader_base_path,  basepath, sizeof(shader_base_path));
+    Q_strlcpy(shader_base_path,  basepath, sizeof(shader_base_path));
 
 	memset(hash_table, 0, sizeof(hash_table));
     memset(source_hash_table, 0, sizeof(source_hash_table));
@@ -549,11 +547,11 @@ void define_shader(const char *shader_source_name, const char *name, const char 
     {
         return;
     }
-    strlcpy(sh->diffuse_map, diffuse_image, sizeof(sh->diffuse_map));
+    Q_strlcpy(sh->diffuse_map, diffuse_image, sizeof(sh->diffuse_map));
     sh->alpha_tested = alpha_tested;
     if (fullbright_image && fullbright_image[0])
     {
-        strlcpy(sh->fullbright_map, fullbright_image, sizeof(sh->fullbright_map));
+        Q_strlcpy(sh->fullbright_map, fullbright_image, sizeof(sh->fullbright_map));
     }
     else
     {

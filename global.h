@@ -79,9 +79,7 @@ char *mem_copystring(mem_pool_t *pool, const char *string);
 char *copystring(const char *string);
 char *mem_sprintf(mem_pool_t *pool, const char *format, ...);
 char *msprintf(const char *format, ...);
-#ifdef WIN32
-void strlcpy(char *dest, const char *src, size_t size);
-#endif
+void Q_strlcpy(char *dest, const char *src, size_t size);
 
 #ifdef WIN32
 # define strcasecmp _stricmp
