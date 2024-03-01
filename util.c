@@ -1,5 +1,8 @@
 /*
     QShed <http://www.icculus.org/qshed>
+	Copyright (C) 1999-2010 id Software LLC, a ZeniMax Media company.
+
+	The list_files function is is part of Spearmint Source Code.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,6 +19,7 @@
 */
 
 #include <errno.h>
+#include <dirent.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -945,4 +949,139 @@ bool_t xbuf_finish_file(xbuf_t *xbuf, char **out_error)
 	xbuf_flush(xbuf);
 
 	return xbuf_free(xbuf, out_error);
+}
+
+void strip_extension( const char *in, char *out ) {
+	while ( *in && *in != '.' ) {
+		*out++ = *in++;
+	}
+	*out = 0;
+}
+
+void replace_extension(char *s, const char *ext, const char *newext)
+{
+    //assert(s != null);
+    //assert(ext != null);
+    //assert(newext != null);
+
+    int s_len = strlen(s);
+    int ext_len = strlen(ext);
+    //assert(ext_len == strlen(newext));
+
+    int ofs = s_len - ext_len;
+    if (ext_len == strlen(newext) && ofs >= 0 && (0 == strcmp(s + ofs, ext)))
+    {
+        for (int i = 0; i < ext_len; i++)
+        {
+            s[ofs + i] = newext[i];
+        }
+    }
+}
+
+#define MAX_OSPATH 1024
+#define MAX_FOUND_FILES 4096
+
+char **list_files(const char *directory, const char *extension, int *num_files) {
+	struct dirent *d;
+	DIR           *fdir;
+	char          *search;
+	int           nfiles;
+	char          **listCopy;
+	char          *list[MAX_FOUND_FILES];
+	int           i;
+	struct stat   st;
+	int			  dironly = 0;
+
+	int           extLen;
+
+	if (!directory || directory[0] == '\0')
+	{
+		*num_files = 0;
+		return 0;
+	}
+
+	if (!extension)
+		extension = "";
+
+	if (extension[0] == '/' && extension[1] == 0)
+	{
+		extension = "";
+		dironly = 1;
+	}
+
+	extLen = strlen(extension);
+
+	// search
+	nfiles = 0;
+
+	if ((fdir = opendir(directory)) == NULL) {
+		*num_files = 0;
+		return 0;
+	}
+
+	while ((d = readdir(fdir)) != NULL)
+	{
+		search = msprintf("%s/%s", directory, d->d_name);
+		if (stat(search, &st) == -1)
+		{
+			continue;
+		}
+		if ((dironly && !(st.st_mode & S_IFDIR)) ||
+			(!dironly && (st.st_mode & S_IFDIR)))
+		{
+			continue;
+		}
+		if (*extension)
+		{
+			if (strlen(d->d_name) < extLen ||
+				strcasecmp(
+					d->d_name + strlen(d->d_name) - extLen,
+					extension))
+			{
+				continue; // didn't match
+			}
+		}
+
+		if (nfiles == MAX_FOUND_FILES - 1)
+		{
+			break;
+		}
+		list[nfiles] = copystring(d->d_name);
+		nfiles++;
+	}
+
+	list[nfiles] = NULL;
+
+	closedir(fdir);
+
+	// return a copy of the list
+	*num_files = nfiles;
+
+	if ( !nfiles ) {
+		return NULL;
+	}
+
+	listCopy = qmalloc((nfiles + 1) * sizeof(*listCopy));
+	for ( i = 0 ; i < nfiles ; i++ ) {
+		listCopy[i] = list[i];
+	}
+	listCopy[i] = NULL;
+
+	return listCopy;
+}
+
+void free_list_files(char **list, int num_files)
+{
+	int i;
+
+	if (!list || !num_files)
+	{
+		return;
+	}
+
+	for (i = 0; i < num_files; i++) {
+		qfree(list[i]);
+		list[i] = 0;
+	}
+	qfree(list);
 }

@@ -21,6 +21,7 @@
 
 #include "global.h"
 #include "model.h"
+#include "shaders.h"
 
 int texwidth = -1;
 int texheight = -1;
@@ -188,6 +189,7 @@ int main(int argc, char **argv)
 	char outfilename[1024] = {0};
 	char texfilename[1024] = {0};
 	char skinpath[1024] = {0};
+	char shaderbasepath[1024] = {0};
 	bool_t notex = false;
 	int flags = 0;
 	bool_t flags_specified = false;
@@ -212,6 +214,7 @@ int main(int argc, char **argv)
 "Output format is specified by the file extension of outfilename.\n"
 "Options:\n"
 "  -i filename        specify the model to load (required).\n"
+"  -s path            specify the shader directory path (required if you want to output shaders)\n"
 "  -notex             remove all existing skins from model after importing.\n"
 "  -tex filename      replace the model's texture with the given texture. This\n"
 "                     is required for any texture to be loaded onto MD2 or MD3\n"
@@ -258,6 +261,16 @@ int main(int argc, char **argv)
 				}
 
 				strlcpy(infilename, argv[i], sizeof(infilename));
+			}
+			else if (!strcmp(argv[i], "-s"))
+			{
+				if (++i == argc)
+				{
+					printf("%s: missing argument for option '-s'\n", argv[0]);
+					return 0;
+				}
+
+				strlcpy(shaderbasepath, argv[i], sizeof(shaderbasepath));
 			}
 			else if (!strcmp(argv[i], "-notex"))
 			{
@@ -437,6 +450,16 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	if (shaderbasepath[0])
+	{
+		 if (!init_shaders(shaderbasepath, &error))
+		 {
+			printf("Failed to initialize shaders: %s.\n", error);
+			qfree(error);
+			return 0;
+		 }
+	}
+
 	model = model_load_from_file(infilename, &error);
 	if (!model)
 	{
@@ -514,6 +537,11 @@ int main(int argc, char **argv)
 			printf("Failed to save model: %s.\n", error);
 			qfree(error);
 		}
+	}
+
+	if (shaderbasepath[0])
+	{
+		write_shaders();
 	}
 
 	model_free(model);

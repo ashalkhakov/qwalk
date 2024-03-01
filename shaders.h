@@ -14,19 +14,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef UTIL_H
-#define UTIL_H
 
-#include <stdio.h>
+#ifndef SHADERS_H
+#define SHADERS_H
 
-unsigned short SwapShort(unsigned short v);
-unsigned int SwapLong(unsigned int v);
-float SwapFloat(float v);
-bool_t yesno(void);
-FILE *openfile_write(const char *filename, char **out_error);
-void strip_extension(const char *in, char *out);
-void replace_extension(char *s, const char *ext, const char *newext);
-char **list_files(const char *dir, const char *extension, int *num_files);
-void free_list_files(char **files, int num_files);
+bool_t init_shaders(const char *basepath, char **out_error);
+void define_shader(const char *shader_source_name, const char *name, const char *diffuse_image, const char *fullbright_image, bool_t alpha_tested);
+void write_shaders(void);
 
 #endif

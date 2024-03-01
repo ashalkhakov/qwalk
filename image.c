@@ -52,6 +52,8 @@ static image_format_t get_image_format(const char *filename)
 
 image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata, size_t filesize, char **out_error)
 {
+	image_rgba_t *image;
+
 	switch (get_image_format(filename))
 	{
 	default:
@@ -59,11 +61,33 @@ image_rgba_t *image_load(mem_pool_t *pool, const char *filename, void *filedata,
 		return (void)(out_error && (*out_error = msprintf("missing file extension"))), NULL;
 	case IMGFMT_UNRECOGNIZED:
 		return (void)(out_error && (*out_error = msprintf("unrecognized file extension"))), NULL;
-	case IMGFMT_PCX: return image_pcx_load(pool, filedata, filesize, out_error);
-	case IMGFMT_TGA: return image_tga_load(pool, filedata, filesize, out_error);
-	case IMGFMT_JPG: return image_jpg_load(pool, filedata, filesize, out_error);
-	case IMGFMT_BMP: return image_bmp_load(pool, filedata, filesize, out_error);
+	case IMGFMT_PCX:
+		image = image_pcx_load(pool, filedata, filesize, out_error);
+		break;
+	case IMGFMT_TGA:
+		image = image_tga_load(pool, filedata, filesize, out_error);
+		break;
+	case IMGFMT_JPG:
+		image = image_jpg_load(pool, filedata, filesize, out_error);
+		break;
+	case IMGFMT_BMP:
+		image = image_bmp_load(pool, filedata, filesize, out_error);
+		break;
 	}
+
+	if (image)
+	{
+		int i, c;
+
+ 		c = image->width * image->height;
+		image->num_transparent_pixels = 0;
+		for (i = 0; i < c; i++)
+		{
+			if (image->pixels[i * 4 + 3] != 255)
+				image->num_transparent_pixels++;
+		}
+	}
+	return image;
 }
 
 image_rgba_t *image_load_from_file(mem_pool_t *pool, const char *filename, char **out_error)

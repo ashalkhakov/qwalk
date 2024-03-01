@@ -24,6 +24,8 @@
 #include "global.h"
 #include "model.h"
 #include "palettes.h"
+#include "util.h"
+#include "shaders.h"
 
 extern const float anorms[162][3];
 
@@ -139,26 +141,6 @@ typedef struct dmdl_s
 
 } dmdl_t;
 
-static void replace_extension(char *s, const char *ext, const char *newext)
-{
-    //assert(s != null);
-    //assert(ext != null);
-    //assert(newext != null);
-
-    int s_len = strlen(s);
-    int ext_len = strlen(ext);
-    //assert(ext_len == strlen(newext));
-
-    int ofs = s_len - ext_len;
-    if (ext_len == strlen(newext) && ofs >= 0 && (0 == strcmp(s + ofs, ext)))
-    {
-        for (int i = 0; i < ext_len; i++)
-        {
-            s[ofs + i] = newext[i];
-        }
-    }
-}
-
 bool_t model_dkm_load(void *filedata, size_t filesize, model_t *out_model, char **out_error) {
 	typedef struct dkm_meshvert_s
 	{
@@ -176,6 +158,7 @@ bool_t model_dkm_load(void *filedata, size_t filesize, model_t *out_model, char 
 	skininfo_t          *skininfo;
 	frameinfo_t         *frameinfo;
     char                skin_name[MAX_SKINNAME+1];
+    char                original_skin_name[MAX_SKINNAME+1];
 	dkm_meshvert_t      *meshverts;
 	unsigned char * const f = (unsigned char*)filedata;
 	float iwidth, iheight;
@@ -230,12 +213,10 @@ bool_t model_dkm_load(void *filedata, size_t filesize, model_t *out_model, char 
         /* this is a warning. FIXME - return warnings too, don't print them here */
             printf("dkm: failed to load image \"%s\": %s\n", skin_name, error);
         }
-        else
+        else if ( image->num_transparent_pixels > 0 )
         {
-            if (!image_save(skin_name, image, &error))
-            {
-                printf("Error saving texture %s: %s", skin_name, error);
-            }
+            strip_extension(skin_name, original_skin_name);
+            define_shader("gen_skins.shader", original_skin_name, skin_name, NULL, 1);
         }
         images[i] = image;
 
