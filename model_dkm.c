@@ -310,6 +310,8 @@ bool_t model_dkm_load(void *filedata, size_t filesize, model_t *out_model, char 
         mesh_initialize(&model, mesh);
 
         mesh->name = mem_copystring(pool, surface_name);
+        if (pinsurface->skinindex >= 0 && pinsurface->skinindex < model.num_skins)
+            mesh->skinindex = pinsurface->skinindex;
 
     /* read skins */
         mesh->skins = (meshskin_t*)mem_alloc(pool, sizeof(meshskin_t) * model.num_skins);

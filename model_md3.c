@@ -517,10 +517,13 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 		}
 
 	/* write shaders */
+		/* the mesh's own skin first, the one Quake 3 draws it with; the
+		   others after it */
 		for (j = 0; j < model->total_skins; j++)
 		{
 			md3_shader_t md3_shader;
-			strcpy(md3_shader.name, skinshaders[j]);
+			int skin = j == 0 ? mesh->skinindex : (j <= mesh->skinindex ? j - 1 : j);
+			strcpy(md3_shader.name, skinshaders[skin]);
 			xbuf_write_data(xbuf, sizeof(md3_shader), &md3_shader);
 		}
 

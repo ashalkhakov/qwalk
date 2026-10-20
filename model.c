@@ -377,6 +377,7 @@ model_t *model_clone(const model_t *model)
 
 		newmodel->meshes[i].num_vertices = model->meshes[i].num_vertices;
 		newmodel->meshes[i].num_triangles = model->meshes[i].num_triangles;
+		newmodel->meshes[i].skinindex = model->meshes[i].skinindex;
 
 		newmodel->meshes[i].vertex3f = (float*)qmalloc(sizeof(float[3]) * model->total_frames * model->meshes[i].num_vertices);
 		memcpy(newmodel->meshes[i].vertex3f, model->meshes[i].vertex3f, sizeof(float[3]) * model->total_frames * model->meshes[i].num_vertices);

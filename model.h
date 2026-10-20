@@ -85,6 +85,7 @@ typedef struct mesh_s
 	int *triangle3i;
 
 	meshskin_t *skins; /* [model.total_skins] */
+	int skinindex; /* the skin it's drawn with (a Daikatana surface's own) */
 
 	struct
 	{
