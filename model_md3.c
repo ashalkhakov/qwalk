@@ -370,7 +370,10 @@ bool_t model_md3_save(const model_t *model, xbuf_t *xbuf, char **out_error)
 			snprintf(skin_image, sizeof(skin_image), "%s", skinshaders[i]);
 		}
 
-		image_save(skin_image, model->meshes[0].skins[i].components[SKIN_DIFFUSE], out_error);
+		/* a skin that couldn't be loaded has no image: the shader name still
+		   goes in the model, there's just no picture to write for it */
+		if (model->meshes[0].skins[i].components[SKIN_DIFFUSE])
+			image_save(skin_image, model->meshes[0].skins[i].components[SKIN_DIFFUSE], out_error);
 
 		if (model->meshes[0].skins[i].components[SKIN_FULLBRIGHT] && model->meshes[0].skins[i].components[SKIN_FULLBRIGHT]->num_nonempty_pixels > 0)
 		{

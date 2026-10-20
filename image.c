@@ -16,6 +16,7 @@
 */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "global.h"
@@ -109,6 +110,7 @@ bool_t image_save(const char *filename, const image_rgba_t *image, char **out_er
 {
 	bool_t (*savefunc)(const image_rgba_t *image, xbuf_t *xbuf, char **out_error) = NULL;
 	xbuf_t *xbuf;
+	char tmpname[1024];
 
 	switch (get_image_format(filename))
 	{
@@ -128,8 +130,11 @@ bool_t image_save(const char *filename, const image_rgba_t *image, char **out_er
 		return (void)(out_error && (*out_error = msprintf("bmp saving not implemented"))), false; /* FIXME - so implement it! */
 	}
 
-/* allocate write buffer and set it up to flush directly to the file */
-	xbuf = xbuf_create_file(262144, filename, out_error);
+/* allocate write buffer and set it up to flush directly to a file next to
+   the one to write, which then takes its place: conversions running at once
+   may read the image (models sharing a skin), and must never see half of it */
+	snprintf(tmpname, sizeof(tmpname), "%s.%d.tmp", filename, (int)getpid());
+	xbuf = xbuf_create_file(262144, tmpname, out_error);
 	if (!xbuf)
 		return false;
 
@@ -137,11 +142,22 @@ bool_t image_save(const char *filename, const image_rgba_t *image, char **out_er
 	if (!(*savefunc)(image, xbuf, out_error))
 	{
 		xbuf_free(xbuf, NULL);
+		remove(tmpname);
 		return false;
 	}
 
 /* flush any remaining data to file and free the buffer */
-	return xbuf_finish_file(xbuf, out_error);
+	if (!xbuf_finish_file(xbuf, out_error))
+	{
+		remove(tmpname);
+		return false;
+	}
+	if (rename(tmpname, filename) != 0)
+	{
+		remove(tmpname);
+		return (void)(out_error && (*out_error = msprintf("couldn't write %s", filename))), false;
+	}
+	return true;
 }
 
 bool_t image_paletted_save(const char *filename, const image_paletted_t *image, char **out_error)
