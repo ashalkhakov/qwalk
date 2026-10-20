@@ -21,7 +21,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __bool_true_false_are_defined
+/* stdbool.h already made false and true macros */
+typedef int bool_t;
+#else
 typedef enum { false = 0, true = 1 } bool_t;
+#endif
 
 /* FIXME - detect endianness? */
 #define LittleShort(x) (x)
