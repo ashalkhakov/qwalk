@@ -338,6 +338,7 @@ static shader_source_t *FindShaderSourceByName(const char *name)
 	hash = generateHashValue(source->filename, FILE_HASH_SIZE);
 	source->next = source_hash_table[hash];
 	source_hash_table[hash] = source;
+	return source;
 }
 
 static shader_t *FindShaderByName(const char *name)
@@ -574,7 +575,7 @@ static void fprint_shader(FILE *fp, shader_t *shader)
     fprintf(fp, "\tsurfaceparm trans\n");
     fprintf(fp, "\t{\n");
     fprintf(fp, "\t\tmap %s\n", shader->diffuse_map);
-    fprintf(fp, "\t\trgbGen identity\n");
+    fprintf(fp, "\t\trgbGen lightingDiffuse\n");
     fprintf(fp, "\t\tdepthWrite\n");
     fprintf(fp, "\t\talphaFunc GE128\n");
     fprintf(fp, "\t}\n");
